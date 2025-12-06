@@ -1,0 +1,29 @@
+# CNN İÇİN DOCKERFILE # we can use python:3.10 instead as well
+FROM python:3.10-slim 
+
+# Prevent Python from writing .pyc files and buffer logs
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Workdir inside the container
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+
+# ---- DEPENDENCIES ----
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir \
+        "tensorflow<2.11" \
+        "pandas==2.3.3" \
+        "numpy==1.26.4"
+
+
+# RUN MAIN AS A MODULE
+CMD ["python", "-m", "main"]
+
+
+# ÇALIŞTIRMAK İÇİN ./src ALTINDAYKEN
+# docker build -t ai-information-detection .   # container oluşturma
+# docker run --rm ai-information-detection     # container çalıştırma
