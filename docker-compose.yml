@@ -1,0 +1,24 @@
+services:
+  aid-dev:
+    build:
+      context: ./src
+      dockerfile: dockerfile   # senin dosya adı küçük harf "dockerfile"
+    image: ai-information-detection:dev
+    working_dir: /app
+    volumes:
+      - ./src:/app        # kodu hosttan container'a bağla
+    command: python -m main
+    tty: true
+    stdin_open: true
+
+  aid-shell:
+    build:
+      context: ./src
+      dockerfile: dockerfile
+    image: ai-information-detection:dev
+    working_dir: /app
+    volumes:
+      - ./src:/app
+    command: bash
+    tty: true
+    stdin_open: true

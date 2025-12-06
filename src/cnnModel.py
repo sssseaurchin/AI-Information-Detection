@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models #if you get could not be resolved error disable and enable pylance
+from tensorflow.keras import layers, models  # type: ignore[import]
 import numpy as np
 import pandas as pd
 
