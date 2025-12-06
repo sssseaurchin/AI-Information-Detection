@@ -25,4 +25,6 @@ pip install "tensorflow<2.11"
 conda install -c conda-forge cudatoolkit=11.2 cudnn=8.1.0
 ```
 
-more instructions yada yada
+if keras returns a could not be resolved error restart pylance by disableing then enabling the extension
+
+more instructions to come
