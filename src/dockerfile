@@ -13,4 +13,4 @@ RUN pip install --upgrade pip && \
 # Kodlar
 COPY . .
 
-CMD ["python3", "main.py"]
+CMD ["python3", "-m", "main"]
