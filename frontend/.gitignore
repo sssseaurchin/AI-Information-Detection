@@ -1,0 +1,130 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+.idea/
+shelf/
+workspace.xml
+tasks.xml
+usage.statistics.xml
+dictionaries
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+__MACOSX/
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.nfs*
+
+node_modules/
+
+# npm logs
+npm-debug.log*
+npm-error.log*
+
+# Yarn
+yarn-debug.log*
+yarn-error.log*
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+!.yarn/patches
+
+# pnpm
+pnpm-debug.log*
+pnpm-lock.yaml
+
+# Bun
+.bun/
+bun.lockb
+
+dist/
+dist-ssr/
+.vite/
+
+# Prebundle cache (used by Vite internally)
+node_modules/.vite/
+
+.env
+.env.*
+!.env.example
+
+*.pem
+*.key
+*.crt
+*.pfx
+
+logs/
+
+# Sublime
+*.sublime-workspace
+*.sublime-project
+
+# Vitest
+.vitest/
+coverage/
+
+# Jest
+coverage/
+*.lcov
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# General caches
+.cache/
+tmp/
+temp/
+
+# Storybook (if used)
+storybook-static/
+
+# Parcel (if ever installed)
+.parcel-cache/
+
+*.tsbuildinfo
+
+*.hot-update.js
+*.hot-update.json
+
+# NPM packing
+*.tgz

@@ -1,0 +1,16 @@
+FROM tensorflow/tensorflow:2.15.0-gpu
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Ek paketler
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Kodlar
+COPY . .
+
+CMD ["python3", "-m", "main"]
