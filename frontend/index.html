@@ -2,29 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Gateway UI</title>
-
-  <!-- CSS -->
+  <title>AID – AI Information Detection</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<h1>Upload Data</h1>
+<header class="topbar">
+  <div class="logo">
+    <span class="logo-big">AID</span>
+    <span class="logo-text">AI<br />Information<br />Detection</span>
+  </div>
 
-<form id="upload-form">
-  <input type="text" name="text" placeholder="Enter text" required />
-  <br /><br />
+  <button id="themeToggle" class="theme-toggle">
+    🌙
+  </button>
+</header>
 
-  <input type="file" name="image" accept="image/*" required />
-  <br /><br />
+<hr />
 
-  <button type="submit">Send</button>
-</form>
+<main class="container">
 
-<pre id="response"></pre>
+  <h2>Paste the post link below</h2>
 
-<!-- JS -->
+  <input
+          type="text"
+          class="input wide"
+          placeholder="https://lalala.com/profile/my_awesome/019571afh918f..."
+  />
+
+  <p class="or">Or...</p>
+
+  <div class="card">
+    <div class="avatar"></div>
+    <div class="username">
+      <p>user12345</p>
+    </div>
+    <input
+            type="text"
+            class="input"
+            placeholder="Paste the text here..."
+    />
+    <div class="dropzone">
+      <p style="color: #888888">Drop the image here</p>
+      <button class="upload-btn">Upload</button>
+    </div>
+    <button class="submit-btn">
+      Analyze
+    </button>
+  </div>
+
+</main>
 <script src="config.js"></script>
-<script defer src="script.js"></script>
+<script src="script.js" defer></script>
 </body>
 </html>
+<!--TODO: fix the upload image button on the dropzone, add phase in button to the link send, make the analyze button actually clickable-->
+<!--TODO: revise data sending to gateway later-->
+<!--minor todo: umm lol revise the username and make it prettier i guess?-->
