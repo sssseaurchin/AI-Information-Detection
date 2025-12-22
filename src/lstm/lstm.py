@@ -6,7 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
  
 # dataset = pd.read_csv('data/Human ChatGPT Comparison Corpus (HC3)/all_clean.csv') # KÜÇÜK
-dataset = pd.read_csv('data/AI_Human.csv/AI_Human_cleaned.csv') # Büyük
+dataset = pd.read_csv('data/AI_Human/AI_Human_cleaned.csv') # Büyük
 
 text_col = dataset.columns[0]
 label_col = dataset.columns[1]

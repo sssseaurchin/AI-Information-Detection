@@ -8,7 +8,7 @@ def AI_Human() -> pd.DataFrame:
     path = "data/AI_Human.csv/AI_Human.csv"
     df = pd.read_csv(path)
     df["generated"] = 1 - df["generated"]  # We need to flip !!! 
-    df.to_csv("data/AI_Human.csv/AI_Human_cleaned.csv", index=False)
+    df.to_csv("data/AI_Human/AI_Human_cleaned.csv", index=False)
 
 
 def humanVSAIJSONL() -> list: 
