@@ -1,7 +1,7 @@
 # 23.12.2025; Happy new years everyone
 import time
 
-class timeTracker:
+class TimeTracker:
     def __init__(self): # Time is started after class initialization
         self.start_time = time.time()
 
@@ -13,7 +13,7 @@ class timeTracker:
     
 
 if __name__ == "__main__":
-    timer = timeTracker()
+    timer = TimeTracker()
 
     time.sleep(2)
 
