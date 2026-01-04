@@ -215,6 +215,56 @@ function setAnalyzeDisabled(disabled) {
         btn.classList.toggle("loading", disabled);
     });
 }
+// overlay
+function showOverlayResult({ label, confidence, details }) {
+    const overlay = document.getElementById("overlay");
+    const radial = overlay.querySelector(".radial");
+    const text = overlay.querySelector(".radial-text");
+
+    document.getElementById("resultLabel").textContent = label;
+    document.getElementById("resultDetails").textContent = details ?? "";
+
+    overlay.classList.add("show");
+    overlay.setAttribute("aria-hidden", "false");
+
+    let current = 0;
+    const target = Math.round(confidence * 100);
+
+    const animate = () => {
+        current += 1;
+        radial.style.setProperty("--value", current);
+        text.textContent = `${current}%`;
+
+        if (current < target) requestAnimationFrame(animate);
+    };
+    animate();
+}
+
+const overlay = document.getElementById("overlay");
+
+overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || e.target.classList.contains("overlay-close")) {
+        overlay.classList.remove("show");
+        overlay.setAttribute("aria-hidden", "true");
+    }
+});
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        overlay.classList.remove("show");
+    }
+});
+// DEBUG...
+document.getElementById("testOverlay")?.addEventListener("click", () => {
+    const confidence = Math.random() * 0.6 + 0.2;
+
+    showOverlayResult({
+        label: confidence > 0.5 ? "Likely AI Generated" : "Likely Human",
+        confidence,
+        details: "This is dummy data used for UI testing."
+    });
+});
+// ...DEBUG
 
 // submit req
 async function submitRequest({ text = null, image = null }) {
@@ -244,6 +294,7 @@ async function submitRequest({ text = null, image = null }) {
         });
 
         const data = await res.json();
+        showOverlayResult(data);
         console.log("Response:", data);
     } catch (err) {
         console.error("Error:", err);

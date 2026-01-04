@@ -282,3 +282,109 @@ h2 {
     opacity: 1;
     pointer-events: auto;
 }
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 220ms var(--ease);
+    z-index: 9999;
+}
+
+.overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.overlay-card {
+    position: relative;
+    width: min(90vw, 360px);
+    padding: 28px;
+    border-radius: 20px;
+    background: var(--bg-card);
+    text-align: center;
+    animation: pop 220ms var(--ease);
+}
+
+@keyframes pop {
+    from { transform: scale(0.95); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+}
+
+.overlay-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.radial {
+    --size: 180px;
+    --thickness: 14px;
+
+    width: var(--size);
+    height: var(--size);
+    margin: 12px auto 20px;
+
+    border-radius: 50%;
+
+    background:
+        /* COVER (animated) */
+            conic-gradient(
+                    from -45deg,
+                    transparent calc(var(--value) * 1%),
+                    #e0e0e0 0
+            ),
+                /* STATIC GRADIENT */
+            conic-gradient(
+                    from -45deg,
+                    #3b82f6 0%,
+                    #22c55e 35%,
+                    #eab308 65%,
+                    #ef4444 100%
+            );
+
+    display: grid;
+    place-items: center;
+
+    transition:
+            background 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-theme="dark"] .radial {
+    background:
+            conic-gradient(
+                    from -45deg,
+                    transparent calc(var(--value) * 1%),
+                    #333 0
+            ),
+            conic-gradient(
+                    from -45deg,
+                    #3b82f6 0%,
+                    #22c55e 35%,
+                    #eab308 65%,
+                    #ef4444 100%
+            );
+}
+
+.radial::before {
+    content: "";
+    width: calc(100% - var(--thickness)*2);
+    height: calc(100% - var(--thickness)*2);
+    background: var(--bg-card);
+    border-radius: 50%;
+}
+
+.radial-text {
+    position: absolute;
+    font-size: 42px;
+    font-weight: bold;
+}
