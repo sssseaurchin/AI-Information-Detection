@@ -8,12 +8,15 @@ import os
 def build_ds_from_csv(dataset_path:str ,csv_name: str, batch_size: int = 32, shuffle: bool = True, image_size: tuple = (224, 224))  -> tf.data.Dataset: 
     csv_path = os.path.join(dataset_path, csv_name)
     dataframe = pd.read_csv(csv_path)
+    dataframe_length = len(dataframe)    
     
     # Load images from paths
-    images = []
-    labels = []
+    images = np.empty((dataframe_length, *image_size, 3), dtype=np.float32)
+    labels = np.empty(dataframe_length, dtype=np.int32)
     i = 0
+    valid_count = 0
     dataframe_length = len(dataframe)
+    
     for _, row in dataframe.iterrows():
         i += 1
         print(f"Loading image {i}/{dataframe_length}", end='\r')
@@ -26,7 +29,8 @@ def build_ds_from_csv(dataset_path:str ,csv_name: str, batch_size: int = 32, shu
         img = cv2.imread(img_path)
         if img is None:
             continue  # Skip if image can't be loaded
-            
+        valid_count += 1
+        
         # Convert BGR to RGB
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
@@ -36,9 +40,10 @@ def build_ds_from_csv(dataset_path:str ,csv_name: str, batch_size: int = 32, shu
         # Normalize to [0, 1]
         img = img.astype(np.float32) / 255.0
         
-        images.append(img)
-        labels.append(1 if category == 'fake' else 0)  # 1 for AI-generated, 0 for real
-    
+        images[valid_count] = img
+        labels[valid_count] = 1 if category == 'fake' else 0  # 1 for AI-generated, 0 for real
+        valid_count += 1
+          
     images = np.array(images)
     labels = np.array(labels)
     
