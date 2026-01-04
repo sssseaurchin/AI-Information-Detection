@@ -5,15 +5,17 @@ import os
 def main():
     # Path to dataset CSV
     csv_name = 'dataset.csv'
-    dataset_path = r"E:\omg bruhhhhhh\DatasetFixed\small_set" # CHANGE THIS TO YOUR DATASET PATH
+    dataset_path = r"E:\omg bruhhhhhh\DatasetFixed\smaller_set" # CHANGE THIS TO YOUR DATASET PATH 
     model_name = 'ai_detection_model.h5'
     model_path = os.path.join(r"./src/cnn/model/", model_name)
     
-    print("Starting CNN training for AI-generated image detection...")
-    
     # Create CSV
     if not os.path.exists(os.path.join(dataset_path, csv_name)):
+        print("CSV file not found.")
+        print("Creating CSV from dataset...")
         create_csv(data_path=dataset_path, output_csv_name=csv_name) 
+    
+    print("Starting CNN training for AI-generated image detection...")
     
     # Train the model
     model, history = train_model(

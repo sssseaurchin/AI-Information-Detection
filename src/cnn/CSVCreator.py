@@ -35,5 +35,3 @@ def create_csv(data_path:str, output_csv_name:str="dataset.csv") -> None:
                     pass # Skip _unsorted folder        
 
     print(f"CSV created: {output_csv_name} at {csv_path}")
-    
-create_csv(r"E:\omg bruhhhhhh\DatasetFixed\train")
