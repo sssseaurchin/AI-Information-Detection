@@ -2,8 +2,8 @@ from pathlib import Path
 import shutil
 import kagglehub
 
-HANDLE = "shanegerami/ai-vs-human-text"
-FILENAME = "AI_Human.csv"  # exact name from your output
+HANDLE = "denvermagtibay/ai-generated-essays-dataset"
+FILENAME = "AI Generated Essays Dataset.csv"  # exact name from your output
 
 # where kagglehub cached it
 dataset_dir = Path(kagglehub.dataset_download(HANDLE))

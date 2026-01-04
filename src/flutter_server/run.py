@@ -25,8 +25,11 @@ def analyze_text():
     if not isinstance(text, str) or not text.strip():
         return jsonify({"error": "Missing/Invalid parameter_key: 'text'"}), 400
 
-    confidence = lstm_analyze_text(text=text) # lstm.services'ten alınan func
-
+    try:
+        confidence = lstm_analyze_text(text=text) # lstm.services'ten alınan func
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+    
     return jsonify({
         "message": "ok",
         "confidence": confidence
