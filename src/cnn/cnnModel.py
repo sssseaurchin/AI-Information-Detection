@@ -5,16 +5,18 @@ import pandas as pd
 import cv2
 import os
 
-def build_ds_from_csv(file_path: str, batch_size: int = 32, shuffle: bool = True, image_size: tuple = (224, 224))  -> tf.data.Dataset: 
-    df = pd.read_csv(file_path)
+def build_ds_from_csv(dataset_path:str ,csv_name: str, batch_size: int = 32, shuffle: bool = True, image_size: tuple = (224, 224))  -> tf.data.Dataset: 
+    csv_path = os.path.join(dataset_path, csv_name)
+    dataframe = pd.read_csv(csv_path)
     
     # Load images from paths
     images = []
     labels = []
     
-    for _, row in df.iterrows():
-        img_path = row['image_path']
+    for _, row in dataframe.iterrows():
+        img_name = row['image_name']
         category = row['category']
+        img_path = os.path.join(dataset_path, category, img_name)
         
         # Load image
         img = cv2.imread(img_path)
@@ -31,7 +33,7 @@ def build_ds_from_csv(file_path: str, batch_size: int = 32, shuffle: bool = True
         img = img.astype(np.float32) / 255.0
         
         images.append(img)
-        labels.append(1 if category == 'pos' else 0)  # 1 for AI-generated, 0 for real
+        labels.append(1 if category == 'fake' else 0)  # 1 for AI-generated, 0 for real
     
     images = np.array(images)
     labels = np.array(labels)
@@ -74,7 +76,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     """Train the CNN model for AI-generated image detection."""
     
     # Load dataset
-    dataset = build_ds_from_csv(dataset_path, batch_size=batch_size)
+    dataset = build_ds_from_csv(dataset_path, csv_name="dataset.csv", batch_size=batch_size)
     
     # Split into train and validation
     dataset_size = len(dataset)
@@ -118,9 +120,3 @@ def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (2
     confidence = predictions[0][1]  # Confidence for AI-generated class
     
     return confidence
-
-# Server call template
-# TODO
-def returnConfidence(confidence: float) -> float:
-    return confidence
-    

@@ -3,10 +3,10 @@ import os
 
 def main():
     # Path to dataset CSV
-    dataset_file = 'dataset.csv'
-    dataset_path = os.path.join(os.path.dirname(__file__), 'dataset', dataset_file)
-    model_file = 'ai_detection_model.h5'
-    model_path = os.path.join(os.path.dirname(__file__), 'models', model_file)
+    dataset_name = 'dataset.csv'
+    dataset_path = r"E:\omg bruhhhhhh\DatasetFixed\train" # CHANGE THIS TO YOUR DATASET PATH
+    model_name = 'ai_detection_model.h5'
+    model_path = os.path.join(r"./src/cnn/model/", model_name)
     
     print("Starting CNN training for AI-generated image detection...")
     
@@ -19,7 +19,7 @@ def main():
     )
     
     # Save the trained model
-    model.save(model_file)
+    model.save(model_path)
     print("Model saved as {model_file}")
     
     # Print final accuracy
