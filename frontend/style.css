@@ -388,3 +388,54 @@ h2 {
     font-size: 42px;
     font-weight: bold;
 }
+
+.overlay-card h3 {
+    margin-top: 6px;
+}
+
+.overlay-card h3:empty {
+    display: none;
+}
+
+.overlay-card[data-error="true"] .radial {
+    opacity: 0.6;
+}
+
+.input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.dropzone[style*="pointer-events: none"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.submit-btn.loading {
+    pointer-events: none;
+}
+
+.submit-btn.loading {
+    overflow: hidden;
+}
+
+.submit-btn.loading::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+
+    background: linear-gradient(
+            90deg,
+            transparent 0%,
+            rgba(59, 130, 246, 0.45) 35%,
+            rgba(59, 130, 246, 0.8) 50%,
+            rgba(59, 130, 246, 0.45) 65%,
+            transparent 100%
+    );
+
+    animation: shimmer 0.8s infinite ease-in-out;
+}
+
+@keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(100%); }
+}

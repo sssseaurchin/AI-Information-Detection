@@ -215,6 +215,20 @@ function setAnalyzeDisabled(disabled) {
         btn.classList.toggle("loading", disabled);
     });
 }
+// input disable after trigger
+function setInputsDisabled(disabled) {
+    linkInput.disabled = disabled;
+    textInput.disabled = disabled;
+
+    dropzone.style.pointerEvents = disabled ? "none" : "";
+    dropzone.style.opacity = disabled ? "0.6" : "";
+
+    if (disabled) {
+        linkInput.blur();
+        textInput.blur();
+    }
+}
+
 // overlay
 function showOverlayResult({ label, confidence, details }) {
     const overlay = document.getElementById("overlay");
@@ -226,6 +240,13 @@ function showOverlayResult({ label, confidence, details }) {
 
     overlay.classList.add("show");
     overlay.setAttribute("aria-hidden", "false");
+
+    if (typeof confidence !== "number") {
+        radial.style.setProperty("--value", 0);
+        text.textContent = "";
+        radial.classList.add("error");
+        return;
+    }
 
     let current = 0;
     const target = Math.round(confidence * 100);
@@ -254,7 +275,42 @@ document.addEventListener("keydown", (e) => {
         overlay.classList.remove("show");
     }
 });
+
+function showError(message) {
+    showOverlayResult({
+        label: "Error",
+        confidence: null,
+        details: message
+    });
+}
 // DEBUG...
+(() => {
+    const testBtn = document.getElementById("testOverlay");
+    if (!testBtn) return;
+
+    // start hidden
+    testBtn.style.display = "none";
+
+    let visible = false;
+
+    document.addEventListener("keydown", (e) => {
+        const isToggle =
+            (e.ctrlKey || e.metaKey) &&
+            e.shiftKey &&
+            e.key.toLowerCase() === "d";
+
+        if (!isToggle) return;
+
+        e.preventDefault();
+        visible = !visible;
+        testBtn.style.display = visible ? "" : "none";
+
+        console.log(
+            `[DEBUG] Test overlay button ${visible ? "shown" : "hidden"}`
+        );
+    });
+})();
+
 document.getElementById("testOverlay")?.addEventListener("click", () => {
     const confidence = Math.random() * 0.6 + 0.2;
 
@@ -285,6 +341,7 @@ async function submitRequest({ text = null, image = null }) {
 
     isSubmitting = true;
     setAnalyzeDisabled(true);
+    setInputsDisabled(true);
 
     try {
         const res = await fetch(GATEWAY_URL + endpoint, {
@@ -293,14 +350,35 @@ async function submitRequest({ text = null, image = null }) {
             body: JSON.stringify(payload)
         });
 
+        if (!res.ok) {
+            let msg = `Server error (${res.status})`;
+            try {
+                const err = await res.json();
+                msg = err?.detail || err?.error || msg;
+            } catch {}
+            throw new Error(msg);
+        }
+
         const data = await res.json();
+
+        // Validate payload shape
+        if (
+            typeof data !== "object" ||
+            typeof data.label !== "string" ||
+            typeof data.confidence !== "number"
+        ) {
+            throw new Error("Invalid response from server");
+        }
+
         showOverlayResult(data);
-        console.log("Response:", data);
+
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Request failed:", err);
+        showError(err.message || "Something went wrong");
     } finally {
         isSubmitting = false;
         setAnalyzeDisabled(false);
+        setInputsDisabled(false);
     }
 }
 
