@@ -54,10 +54,7 @@ if __name__ == "__main__":
     print("Starting Downloader")
 
     # Kaggle
-    kaggle_download(
-        "denvermagtibay/ai-generated-essays-dataset",
-        "AI Generated Essays Dataset.csv",
-    )
+    kaggle_download("shanegerami/ai-vs-human-text", "AI_Human.csv")
 
     # Hugging Face
     hugging_face_download("artem9k/ai-text-detection-pile")
