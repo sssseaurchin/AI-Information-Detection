@@ -12,8 +12,12 @@ def build_ds_from_csv(dataset_path:str ,csv_name: str, batch_size: int = 32, shu
     # Load images from paths
     images = []
     labels = []
-    
+    i = 0
+    dataframe_length = len(dataframe)
     for _, row in dataframe.iterrows():
+        i += 1
+        print(f"Loading image {i}/{dataframe_length}", end='\r')
+        
         img_name = row['image_name']
         category = row['category']
         img_path = os.path.join(dataset_path, category, img_name)
@@ -99,8 +103,10 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Train model
     history = model.fit(
         train_dataset,
-        validation_data=val_dataset,
-        epochs=epochs
+        validation_data=val_dataset, # TODO Hook the separate validation data
+        epochs=epochs,
+        use_multiprocessing=True,
+        verbose="1"
     )
     
     return model, history
