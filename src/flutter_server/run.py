@@ -3,8 +3,15 @@ from lstm.services import analyze_text as lstm_analyze_text
 
 app = Flask(__name__)
 
+@app.get("/")
+def index():
+    return jsonify({"message": "Welcome to homepage!"})
 
-@app.get("/analyze_image")
+@app.get("/ping")
+def ping():
+    return jsonify({"message": "pong"})
+
+@app.post("/analyze_image")
 def analyze_image():
     confidence = 0.95  # Örnek confidence score
     return jsonify({"message": "ok"})
