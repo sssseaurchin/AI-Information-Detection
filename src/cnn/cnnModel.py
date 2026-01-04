@@ -8,50 +8,31 @@ import os
 def build_ds_from_csv(dataset_path:str ,csv_name: str, batch_size: int = 32, shuffle: bool = True, image_size: tuple = (224, 224))  -> tf.data.Dataset: 
     csv_path = os.path.join(dataset_path, csv_name)
     dataframe = pd.read_csv(csv_path)
-    dataframe_length = len(dataframe)    
     
-    # Load images from paths
-    images = np.empty((dataframe_length, *image_size, 3), dtype=np.float32)
-    labels = np.empty(dataframe_length, dtype=np.int32)
-    i = 0
-    valid_count = 0
-    dataframe_length = len(dataframe)
-    
+    # Collect paths and labels
+    paths = []
+    labels = []
     for _, row in dataframe.iterrows():
-        i += 1
-        print(f"Loading image {i}/{dataframe_length}", end='\r')
-        
         img_name = row['image_name']
         category = row['category']
         img_path = os.path.join(dataset_path, category, img_name)
-        
-        # Load image
-        img = cv2.imread(img_path)
-        if img is None:
-            continue  # Skip if image can't be loaded
-        valid_count += 1
-        
-        # Convert BGR to RGB
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        # Resize image
-        img = cv2.resize(img, image_size)
-        
-        # Normalize to [0, 1]
-        img = img.astype(np.float32) / 255.0
-        
-        images[valid_count] = img
-        labels[valid_count] = 1 if category == 'fake' else 0  # 1 for AI-generated, 0 for real
-        valid_count += 1
-          
-    images = np.array(images)
-    labels = np.array(labels)
+        paths.append(img_path)
+        labels.append(1 if category == 'fake' else 0)  # 1 for AI-generated, 0 for real
     
-    print(f"Loaded {len(images)} images with shape {images.shape}")
+    # Create dataset from paths and labels
+    dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
     
-    dataset = tf.data.Dataset.from_tensor_slices((images, labels))
+    def load_and_preprocess_image(path, label):
+        img = tf.io.read_file(path)
+        img = tf.image.decode_image(img, channels=3, expand_animations=False)
+        img = tf.image.resize(img, image_size)
+        img = tf.cast(img, tf.float32) / 255.0
+        return img, label
+    
+    dataset = dataset.map(load_and_preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
+    
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=len(images))
+        dataset = dataset.shuffle(buffer_size=len(paths))
     dataset = dataset.batch(batch_size).prefetch(tf.data.AUTOTUNE)
     
     return dataset
@@ -84,16 +65,64 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) ->
 def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, validation_split: float = 0.2) -> tuple[tf.keras.Model, callbacks.History]:
     """Train the CNN model for AI-generated image detection."""
     
-    # Load dataset
-    dataset = build_ds_from_csv(dataset_path, csv_name="dataset.csv", batch_size=batch_size)
+    csv_path = os.path.join(dataset_path, "dataset.csv")
+    dataframe = pd.read_csv(csv_path)
+    
+    # Collect paths and labels
+    paths = []
+    labels = []
+    for _, row in dataframe.iterrows():
+        img_name = row['image_name']
+        category = row['category']
+        img_path = os.path.join(dataset_path, category, img_name)
+        paths.append(img_path)
+        labels.append(1 if category == 'fake' else 0)  # 1 for AI-generated, 0 for real
     
     # Split into train and validation
-    dataset_size = len(dataset)
-    val_size = int(dataset_size * validation_split)
-    train_size = dataset_size - val_size
+    num_samples = len(paths)
+    indices = np.arange(num_samples)
+    np.random.shuffle(indices)
+    val_size = int(num_samples * validation_split)
+    train_indices = indices[val_size:]
+    val_indices = indices[:val_size]
     
-    train_dataset = dataset.take(train_size)
-    val_dataset = dataset.skip(train_size)
+    train_paths = [paths[i] for i in train_indices]
+    train_labels = [labels[i] for i in train_indices]
+    val_paths = [paths[i] for i in val_indices]
+    val_labels = [labels[i] for i in val_indices]
+    
+    def load_and_preprocess_image(path, label):
+        def _load_py(path, label):
+            try:
+                img_bytes = tf.io.read_file(path)
+                img = tf.image.decode_image(img_bytes, channels=3, expand_animations=False)
+                img = tf.image.resize(img, (224, 224))
+                img = tf.cast(img, tf.float32) / 255.0
+                return img, label, 1  # 1 for valid
+            except:
+                # For corrupt images, return zeros and mark invalid
+                img = tf.zeros((224, 224, 3), dtype=tf.float32)
+                return img, label, 0  # 0 for invalid
+        
+        result = tf.py_function(_load_py, [path, label], [tf.float32, tf.int32, tf.int32])
+        img, lbl, valid = result[0], result[1], result[2]
+        img.set_shape((224, 224, 3))
+        lbl.set_shape(())
+        valid.set_shape(())
+        return img, lbl, valid
+    
+    # Create train dataset
+    train_dataset = tf.data.Dataset.from_tensor_slices((train_paths, train_labels))
+    train_dataset = train_dataset.map(load_and_preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
+    train_dataset = train_dataset.cache(os.path.join(dataset_path, 'train_cache'))
+    train_dataset = train_dataset.shuffle(buffer_size=1024)
+    train_dataset = train_dataset.batch(batch_size).prefetch(tf.data.AUTOTUNE)
+    
+    # Create val dataset
+    val_dataset = tf.data.Dataset.from_tensor_slices((val_paths, val_labels))
+    val_dataset = val_dataset.map(load_and_preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
+    val_dataset = val_dataset.cache(os.path.join(dataset_path, 'val_cache'))
+    val_dataset = val_dataset.batch(batch_size).prefetch(tf.data.AUTOTUNE)
     
     # Build model
     model = build_cnn_model()
@@ -102,15 +131,15 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     model.compile(
         optimizer='adam',
         loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
+        metrics=['accuracy'],
+        weighted_metrics=[]
     )
     
     # Train model
     history = model.fit(
         train_dataset,
-        validation_data=val_dataset, # TODO Hook the separate validation data
+        validation_data=val_dataset,
         epochs=epochs,
-        use_multiprocessing=True,
         verbose="1"
     )
     
