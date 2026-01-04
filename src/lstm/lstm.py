@@ -4,7 +4,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
- 
+from utility import TimeTracker
+
+timer = TimeTracker()
 # dataset = pd.read_csv('data/Human ChatGPT Comparison Corpus (HC3)/all_clean.csv') # KÜÇÜK
 dataset = pd.read_csv('data/AI_Human/AI_Human_cleaned.csv') # Büyük
 
@@ -46,7 +48,7 @@ y_pred = clf.predict(x_test)
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("Confusion matrix:\n", confusion_matrix(y_test, y_pred))
 print("Report:\n", classification_report(y_test, y_pred))
-
+print("Total time:", timer.get_elapsed_time())
 
 
 """# Feature Scaling
