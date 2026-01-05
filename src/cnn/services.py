@@ -20,12 +20,13 @@ import tensorflow as tf
 
 MODEL_NAME = "model.h5"
 
-def cnn_analyze_image(image_path_input):
+def cnn_analyze_image(image_name):
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
+    
     MODEL_PATH = os.path.join(current_dir, "model", MODEL_NAME) 
     
-    final_image_path = str(image_path_input)
+    final_image_path = os.path.join(current_dir, image_name)
 
     print(f"DEBUG: Model Yolu: {MODEL_PATH}")
     print(f"DEBUG: Resim Yolu: {final_image_path}")
