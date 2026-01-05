@@ -30,7 +30,7 @@ def analyze_image():
     except Exception as e:
         return jsonify({"error": f"Failed on saving image! {e}"}), 400
     
-    confidence = cnn_analyze_image(image_path=image_path)
+    confidence = cnn_analyze_image(image_path)
 
     return jsonify({
         "label": "Likeness to be Generated",
