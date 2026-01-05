@@ -30,23 +30,3 @@ def humanVSAIJSONL() -> list:
         # print(rows) 
     df = pd.DataFrame(rows)
     df.to_csv("data/Human ChatGPT Comparison Corpus (HC3)/all_clean.csv", index=False)
- 
-
-"""
-def save_df_to_mega(new_df : pd.DataFrame):
-    MEGALADON = "data/megaladon.csv" 
-
-    # if file exists, load and append safely 
-    existing_df = pd.read_csv(MEGALADON)
-
-    # combine + remove duplicates
-    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-    combined_df.drop_duplicates(inplace=True)
-
-    combined_df.to_csv(MEGALADON, index=False) 
-
-def save_list_to_mega(data:list):  # kinda dumb to have this
-    new_df = pd.DataFrame(data)
-    save_df_to_mega(new_df)
-
-"""
