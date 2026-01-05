@@ -7,6 +7,9 @@ services:
     working_dir: /app
     volumes:
       - ./src:/app        # kodu hosttan container'a bağla
+      - ./Dataset:/data/dataset  # Dataset klasörünü mount et
+    environment:
+      - DATASET_PATH=/data/dataset/train  # Dataset path'i environment variable olarak
     command: python -m main
     tty: true
     stdin_open: true
@@ -19,6 +22,9 @@ services:
     working_dir: /app
     volumes:
       - ./src:/app
+      - ./Dataset:/data/dataset  # Dataset klasörünü mount et
+    environment:
+      - DATASET_PATH=/data/dataset/train
     command: bash
     tty: true
     stdin_open: true
