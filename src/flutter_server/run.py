@@ -1,5 +1,8 @@
+from utility import save_image_from_base64
 from flask import Flask, jsonify, request
 from lstm.services import analyze_text as lstm_analyze_text
+from cnn.services import cnn_analyze_image
+
 
 app = Flask(__name__)
 
@@ -11,10 +14,34 @@ def index():
 def ping():
     return jsonify({"message": "pong"})
 
+
+
+
 @app.post("/analyze_image")
 def analyze_image():
-    confidence = 0.95  # Örnek confidence score
-    return jsonify({"message": "ok"})
+
+    payload = request.get_json() or {}
+    b64 = payload.get("image_base64") or payload.get("base64") or payload.get("b64")
+
+    ext = payload.get("ext", "jpg") # !!!!
+
+    try:
+        image_path = save_image_from_base64()
+    except:
+        return {{
+            "error": "Failed on saving image!"
+        }}
+    
+    confidence = cnn_analyze_image(image_path=image_path)
+
+    return jsonify({
+        "label": "Likeness to be Generated",
+        "confidence": confidence,
+        "details": "Someone should write a text classifier for this later"
+    })
+
+
+
 
 @app.post("/analyze_text")
 def analyze_text():
@@ -31,8 +58,9 @@ def analyze_text():
         return jsonify({"error": str(e)}), 500
     
     return jsonify({
-        "message": "ok",
-        "confidence": confidence
+    "label": "Likeness to be Generated",
+    "confidence": confidence,
+    "details": "Someone should write a text classifier for this later"
     })
 
 if __name__ == "__main__":
