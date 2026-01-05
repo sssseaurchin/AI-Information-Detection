@@ -1,5 +1,6 @@
 ### Project Specific ###
 dataset
+src/cnn/model
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
