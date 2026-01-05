@@ -105,7 +105,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
                 return img, label, 0  # 0 for invalid
         
         result = tf.py_function(_load_py, [path, label], [tf.float32, tf.int32, tf.int32])
-        img, lbl, valid = result[0], result[1], result[2]
+        img, lbl, valid = result[0], result[1], result[2] # type: ignore
         img.set_shape((224, 224, 3))
         lbl.set_shape(())
         valid.set_shape(())
