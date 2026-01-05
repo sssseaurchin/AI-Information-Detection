@@ -63,10 +63,10 @@ def _hugging_face_download(name: str, save_name: str | None = None, subset = Non
         logging.info(f"[HF] Already exists, skipping save_to_disk: {out_dir}")
         return out_dir
     
-
-    dataset = load_dataset(name, cache_dir=str(hf_cache))
-    out_dir.parent.mkdir(parents=True, exist_ok=True)
-    dataset.save_to_disk(str(out_dir))
+    if subset:
+    dataset = load_dataset(name, cache_dir=str(hf_cache), subset=subset)
+    else:
+        dataset = load_dataset(name, cache_dir=str(hf_cache))   
 
     # print(f"[HF] Cache dir: {hf_cache}")
     logging.info(f"[HF] Saved to: {out_dir}")
