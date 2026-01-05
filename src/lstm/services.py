@@ -1,4 +1,4 @@
-from lstm_utils import get_ai_score
+from .lstm_utils import get_ai_score
 
 def analyze_text(text: str) -> float:
     prediction = get_ai_score(text)
