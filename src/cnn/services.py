@@ -47,4 +47,5 @@ def cnn_analyze_image(image_name):
 
 if __name__ == "__main__": 
     cnn_analyze_image(r"aaa.jpg")
+    # prayers
             
