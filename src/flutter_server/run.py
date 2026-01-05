@@ -27,8 +27,8 @@ def analyze_image():
 
     try:
         image_path = save_image_from_base64(base64_str=b64, ext=ext)
-    except:
-        return jsonify({"error": "Failed on saving image!"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed on saving image! {e}"}), 400
     
     confidence = cnn_analyze_image(image_path=image_path)
 
