@@ -12,9 +12,10 @@ def main():
     if not dataset_path:
         # Get absolute path to Dataset folder in project root
         # main.py is in src/cnn/, so we go up 2 levels to project root
-        current_file_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(os.path.dirname(current_file_dir))
-        dataset_path = os.path.join(project_root, 'Dataset', 'train')
+        # current_file_dir = os.path.dirname(os.path.abspath(__file__))
+        # project_root = os.path.dirname(os.path.dirname(current_file_dir))
+        # dataset_path = os.path.join(project_root, 'Dataset', 'train')
+        dataset_path = r"E:\omg bruhhhhhh\DatasetFixed\small_set"
         
         # Use absolute path
         dataset_path = os.path.abspath(dataset_path)
@@ -43,11 +44,11 @@ def main():
     # Train the model with optimized settings
     model, history = train_model(
         dataset_path=dataset_path,
-        epochs=20,  # Adjust as needed
+        epochs=10,  # Adjust as needed
         batch_size=32,
         validation_split=0.2,
         use_cache=True,  # Enable caching for faster subsequent epochs
-        cache_in_memory=False,  # Use disk cache (set True for small datasets)
+        cache_in_memory=False,  # Set to True if dataset fits in memory
         use_mixed_precision=True,  # Enable mixed precision for faster GPU training
         enable_augmentation=False,  # Set True to enable data augmentation
         model_save_path=model_path  # Save best model during training

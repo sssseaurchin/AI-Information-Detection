@@ -56,16 +56,17 @@ def build_ds_from_csv(dataset_path: str, csv_name: str, batch_size: int = 32, sh
     # Filter out invalid images
     dataset = dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
     
-    # Cache in memory if requested
-    if use_cache:
-        dataset = dataset.cache()
-    
     # Shuffle if requested
     if shuffle:
         dataset = dataset.shuffle(buffer_size=min(1024, len(paths)))
     
     # Batch and prefetch
     dataset = dataset.batch(batch_size, drop_remainder=False)
+    
+    # Cache in memory if requested
+    if use_cache:
+        dataset = dataset.cache()
+    
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
     
     return dataset
@@ -222,22 +223,22 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     if enable_augmentation:
         train_dataset = train_dataset.map(augment_image, num_parallel_calls=tf.data.AUTOTUNE)
     
+    # Batch: Group into batches
+    train_dataset = train_dataset.batch(batch_size, drop_remainder=False)
+    
     # Cache: Store preprocessed images (memory or disk based on parameter)
     if use_cache:
         if cache_in_memory:
             train_dataset = train_dataset.cache()  # Memory cache
         else:
-            # Use disk cache only if dataset is reasonably sized (< 50K images)
-            if num_samples < 50000:
+            # Use disk cache only if dataset is reasonably sized (< 100K images)
+            if num_samples < 100000:
                 train_dataset = train_dataset.cache(os.path.join(dataset_path, 'train_cache'))
             else:
                 print("Warning: Dataset too large for disk cache, skipping cache for better performance")
-    
+                
     # Shuffle: Randomize order (after cache for efficiency)
-    train_dataset = train_dataset.shuffle(buffer_size=min(1024, len(train_paths)))
-    
-    # Batch: Group into batches
-    train_dataset = train_dataset.batch(batch_size, drop_remainder=False)
+    train_dataset = train_dataset.shuffle(buffer_size=min(1024, len(train_paths)), reshuffle_each_iteration=True) #TODO Change buffer size?
     
     # Prefetch: Prepare next batch while GPU is training
     train_dataset = train_dataset.prefetch(tf.data.AUTOTUNE)
@@ -258,16 +259,18 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Ignore errors for corrupt images
     val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
     
+    # Batch: Group into batches (no shuffle for validation)
+    val_dataset = val_dataset.batch(batch_size, drop_remainder=False)
+    
     # Cache: Store preprocessed images
     if use_cache:
         if cache_in_memory:
             val_dataset = val_dataset.cache()  # Memory cache
         else:
-            if num_samples < 50000:
+            if num_samples < 100000:
                 val_dataset = val_dataset.cache(os.path.join(dataset_path, 'val_cache'))
-    
-    # Batch: Group into batches (no shuffle for validation)
-    val_dataset = val_dataset.batch(batch_size, drop_remainder=False)
+            else:
+                print("Warning: Dataset too large for disk cache, skipping cache for better performance")
     
     # Prefetch: Prepare next batch while GPU is validating
     val_dataset = val_dataset.prefetch(tf.data.AUTOTUNE)
@@ -319,16 +322,6 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
             verbose=1
         )
         callback_list.append(model_checkpoint)
-    
-    # Reduce learning rate on plateau
-    reduce_lr = callbacks.ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.5,
-        patience=3,
-        min_lr=1e-7,
-        verbose=1
-    )
-    callback_list.append(reduce_lr)
     
     # Train model
     print(f"\nTraining with {len(train_paths)} training samples and {len(val_paths)} validation samples")
