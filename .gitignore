@@ -9,7 +9,8 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.keras
+*.pickle
 # Distribution / packaging
 .Python
 build/

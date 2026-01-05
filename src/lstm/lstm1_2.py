@@ -10,7 +10,7 @@ from sklearn.pipeline import make_pipeline
 
 
 timer = TimeTracker()
-# dataset = pd.read_csv('data/Human ChatGPT Comparison Corpus (HC3)/all_clean.csv') # KÜÇÜK
+# dataset = pd.read_csv('data/Human ChatGPT Comparison Corpus (HC3)/all_clean.csv') 
 dataset = pd.read_csv('data/AI_Human/AI_Human_cleaned.csv') # Büyük
 
 text_col = dataset.columns[0]
@@ -60,7 +60,7 @@ set_test = set(x_test_text)
 
 
 
-print("AAAAAAAAAAA: ", len(set_train & set_test) ) # ortak metin sayısı train ve test arasında
+print("AAAAAAAAAAA: ", len(set_train & set_test) )
 
 
 vectorizer = TfidfVectorizer(

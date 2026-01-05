@@ -140,3 +140,23 @@ print("\nClassification Report:")
 print(classification_report(y_test, y_pred))
 print("-" * 50)
 print("Total time:", timer.get_elapsed_time())
+
+
+
+
+# --- 8. (SAVE) ---
+
+
+
+import pickle
+
+# 1. Save Model
+print(">>> Saving model...")
+model.save('ai_detector_model.keras')
+print("✅ Model file (.keras) created.")
+
+# 2. Save Tokenizer
+print(">>> saving Tokenizer...")
+with open('tokenizer.pickle', 'wb') as handle:
+    pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+print("✅ Tokenizer file (.pickle) created.")
