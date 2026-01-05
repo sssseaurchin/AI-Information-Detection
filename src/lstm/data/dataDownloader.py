@@ -53,7 +53,7 @@ def _kaggle_download(handle: str, filename: str) -> Path:
     logging.info(f"[Kaggle] Copied to: {file}") 
     return file
 
-def _hugging_face_download(name: str, save_name: str | None = None, subset = None) -> Path: # TODO: IMPLEMENT SUPPORT FOR SUBSETS 
+def _hugging_face_download(name: str, save_name: str | None = None, subset = None) -> Path:
     hf_cache = DATA_DIR / "hf_cache"
     hf_cache.mkdir(parents=True, exist_ok=True)
     out_dir_name = save_name or name.split("/")[-1]
@@ -64,9 +64,11 @@ def _hugging_face_download(name: str, save_name: str | None = None, subset = Non
         return out_dir
     
     if subset:
-    dataset = load_dataset(name, cache_dir=str(hf_cache), subset=subset)
+        dataset = load_dataset(name, cache_dir=str(hf_cache), subset=subset)
     else:
-        dataset = load_dataset(name, cache_dir=str(hf_cache))   
+        dataset = load_dataset(name, cache_dir=str(hf_cache))
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    dataset.save_to_disk(str(out_dir))
 
     # print(f"[HF] Cache dir: {hf_cache}")
     logging.info(f"[HF] Saved to: {out_dir}")
