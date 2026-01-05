@@ -1,10 +1,11 @@
 import cnnModel
+import tensorflow as tf
+import os
 
 def cnn_analyze_image(image_path:str):
-    MODEL_PATH = r"\model\ai_detection_model.h5"
-
-
-    model = cnnModel.load_model(MODEL_PATH)
+    path = os.path.dirname(os.path.abspath(__file__))
+    MODEL_PATH = os.path.join(path, "model", "ai_detection_model.h5")
+    model = tf.keras.models.load_model(MODEL_PATH)
     prediction = cnnModel.predict_image(model, image_path)
 
     print(f"Prediction for image {image_path}: {prediction}")
