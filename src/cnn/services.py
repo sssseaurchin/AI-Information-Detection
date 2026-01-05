@@ -1,4 +1,4 @@
-import cnnModel
+from cnn import cnnModel
 import tensorflow as tf
 import os
 
