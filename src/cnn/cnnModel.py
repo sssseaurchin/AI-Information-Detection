@@ -5,6 +5,15 @@ import pandas as pd
 import cv2
 import os
 
+# Enable OpenCV optimizations
+cv2.setUseOptimized(True)
+cv2.setNumThreads(0)  # 0 = use all CPU cores
+# Enable OpenCL support if available (for GPU acceleration)
+try:
+    cv2.ocl.setUseOpenCL(True)
+except:
+    pass 
+
 def build_ds_from_csv(dataset_path:str ,csv_name: str, batch_size: int = 32, shuffle: bool = True, image_size: tuple = (224, 224))  -> tf.data.Dataset: 
     csv_path = os.path.join(dataset_path, csv_name)
     dataframe = pd.read_csv(csv_path)
