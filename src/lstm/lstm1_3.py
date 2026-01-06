@@ -33,7 +33,7 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 # -----------------------------
 # Config
 # -----------------------------
-DATA_PATH = Path("data/AI_Human/AI_Human_cleaned.csv")
+DATA_PATH = Path("data/data/AI_Human_cleaned.csv")
 
 MAX_NB_WORDS = 20_000
 MAX_SEQUENCE_LENGTH = 200
