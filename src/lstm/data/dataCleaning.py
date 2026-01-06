@@ -7,6 +7,7 @@ import pandas as pd
 def AI_Human() -> pd.DataFrame:
     path = "data/AI_Human.csv"
     df = pd.read_csv(path)
+    df = df[:3000]
     df["generated"] = 1 - df["generated"]  # We need to flip !!! 
     df.to_csv("data/AI_Human_cleaned.csv", index=False)
 
@@ -65,4 +66,4 @@ def students_vs_ai() -> pd.DataFrame:
 
 
 
-students_vs_ai()
+AI_Human()

@@ -43,10 +43,10 @@ TEST_SIZE = 0.2
 RANDOM_SEED = 0
 
 BATCH_SIZE = 64
-EPOCHS = 5
+EPOCHS = 1
 VAL_SPLIT = 0.1
 
-MODEL_OUT = Path("ai_detector_model.h5")
+MODEL_OUT = Path("lstm_model.h5")
 TOKENIZER_OUT = Path("tokenizer.pickle")
 
 
