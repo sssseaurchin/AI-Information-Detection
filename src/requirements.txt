@@ -1,6 +1,8 @@
 pandas==2.3.3
-numpy==1.26.4
-numpy==1.26.4
+numpy==1.26.4 
 Flask==3.0.3
 opencv-python==4.8.1.78
 joblib==1.4.2
+Tensorflow==2.11
+kagglehub==0.3.13
+datasets==4.4.2

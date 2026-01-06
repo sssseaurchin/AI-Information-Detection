@@ -1,4 +1,4 @@
-from utility import save_image_from_base64
+from .utility import save_image_from_base64
 from flask import Flask, jsonify, request
 from lstm.services import analyze_text as lstm_analyze_text
 from cnn.services import cnn_analyze_image
@@ -26,13 +26,12 @@ def analyze_image():
     ext = payload.get("ext", "jpg") # !!!!
 
     try:
-        image_path = save_image_from_base64()
-    except:
-        return {{
-            "error": "Failed on saving image!"
-        }}
+        image_path = save_image_from_base64(base64_str=b64, ext=ext)
+        print(f"Image saved at: {image_path}")
+    except Exception as e:
+        return jsonify({"error": f"Failed on saving image! {e}"}), 400
     
-    confidence = cnn_analyze_image(image_path=image_path)
+    confidence = cnn_analyze_image(image_path)
 
     return jsonify({
         "label": "Likeness to be Generated",
@@ -57,6 +56,7 @@ def analyze_text():
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
     
+    print(f"Text analyzed with confidence: {confidence}")
     return jsonify({
     "label": "Likeness to be Generated",
     "confidence": confidence,
