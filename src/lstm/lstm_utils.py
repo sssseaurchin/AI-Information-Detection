@@ -34,8 +34,10 @@ except Exception as e:
 def get_ai_score(text: str) -> float:
     """Returns a score between 0.0 and 1.0. Returns -1.0 on error."""
     if model is None or tokenizer is None:
+        print("ERROR: Model or tokenizer not loaded.")
         return -1.0
     if not isinstance(text, str) or not text.strip():
+        print("ERROR: Model or tokenizer not loaded.")
         return -1.0
 
     try:

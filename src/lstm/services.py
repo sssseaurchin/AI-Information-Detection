@@ -1,6 +1,7 @@
 from .lstm_utils import get_ai_score
 
 def analyze_text(text: str) -> float:
+    print("Entering analyze_text")
     prediction = get_ai_score(text)
     
     print(f"Input: {text[:30]}... -> Score: {prediction}")
