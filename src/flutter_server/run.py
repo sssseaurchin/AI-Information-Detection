@@ -27,6 +27,7 @@ def analyze_image():
 
     try:
         image_path = save_image_from_base64(base64_str=b64, ext=ext)
+        print(f"Image saved at: {image_path}")
     except Exception as e:
         return jsonify({"error": f"Failed on saving image! {e}"}), 400
     
@@ -55,6 +56,7 @@ def analyze_text():
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
     
+    print(f"Text analyzed with confidence: {confidence}")
     return jsonify({
     "label": "Likeness to be Generated",
     "confidence": confidence,

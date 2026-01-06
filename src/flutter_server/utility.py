@@ -49,7 +49,7 @@ def save_image_from_base64(base64_str: str, ext: str = ".png") -> Path:
         f.write(data)
     os.replace(tmp_path, path)
 
-    return path
+    return path.absolute()
 
 
 if __name__ == "__main__":

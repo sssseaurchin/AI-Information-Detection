@@ -20,7 +20,7 @@ except Exception as e:
 def get_ai_score(text: str) -> float:
     """0.0 between 1.0."""
     if model is None or tokenizer is None or not text:
-        return 0.0
+        return -1.0
     
     try:
         text_clean = str(text).lower()
@@ -28,5 +28,6 @@ def get_ai_score(text: str) -> float:
         pad = pad_sequences(seq, maxlen=MAX_SEQUENCE_LENGTH)
         prediction = model.predict(pad, verbose=0)
         return float(prediction[0][0])
-    except:
-        return 0.0
+    except Exception as e:
+        print(f"ERROR during prediction: {e}")
+        return -1.0

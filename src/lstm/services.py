@@ -18,6 +18,6 @@ if __name__ == "__main__":
     print(f"Result: {result}")
     
     if result > 0.5:
-        print(f"Result: 🤖 AI (accuracy: %{result*100:.2f})")
+        print(f"Result: AI (accuracy: %{result*100:.2f})")
     else:
-        print(f"Result: 👤 HUMAN (accuracy: %{(1-result)*100:.2f})")
+        print(f"Result: HUMAN (accuracy: %{(1-result)*100:.2f})")
