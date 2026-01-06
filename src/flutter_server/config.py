@@ -1,1 +1,0 @@
-# burada CNN ve LSTM'in fonksiyonlarının isimleri olacak

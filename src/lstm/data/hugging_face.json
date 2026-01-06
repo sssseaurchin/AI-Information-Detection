@@ -1,0 +1,11 @@
+[
+    {
+        "url":"https://huggingface.co/datasets/artem9k/ai-text-detection-pile?library=datasets",
+        "name":"artem9k/ai-text-detection-pile"
+    },
+    {
+        "url": "https://huggingface.co/datasets/Hello-SimpleAI/HC3?utm_source=chatgpt.com",
+        "name": "Hello-SimpleAI/HC3",
+        "subset": "all"
+    } 
+]

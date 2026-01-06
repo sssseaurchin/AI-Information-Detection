@@ -1,5 +1,9 @@
 ### Project Specific ###
 dataset
+src/cnn/model
+
+*.jpeg
+*.png
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -9,7 +13,8 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.keras
+*.pickle
 # Distribution / packaging
 .Python
 build/

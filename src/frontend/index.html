@@ -23,13 +23,14 @@
 <main class="container">
 
   <h2>Paste the post link below</h2>
-
-  <input
-          type="text"
-          class="input wide"
-          placeholder="https://lalala.com/profile/my_awesome/019571afh918f..."
-  />
-
+  <div>
+    <input
+            type="text"
+            class="input wide"
+            placeholder="https://lalala.com/profile/my_awesome/019571afh918f..."
+    />
+  </div>
+  <button class="submit-btn link-analyze" style="position: relative; left: 38% ">Analyze</button>
   <p class="or">Or...</p>
 
   <div class="card">
@@ -45,10 +46,28 @@
     <div class="dropzone">
       <p style="color: #888888">Drop the image here</p>
       <button class="upload-btn">Upload</button>
+      <button class="remove-btn" aria-label="Remove image">✕</button>
     </div>
     <button class="submit-btn">
       Analyze
     </button>
+  </div>
+  <!--  REMOVE LATER...-->
+  <button id="testOverlay" style="margin-top:20px;">
+    Test Result Overlay
+  </button>
+  <!--  ...REMOVE LATER-->
+  <div id="overlay" class="overlay" aria-hidden="true">
+    <div class="overlay-card" role="dialog">
+      <button class="overlay-close">✕</button>
+
+      <div class="radial" style="--value:0">
+        <span class="radial-text">0%</span>
+      </div>
+
+      <h3 id="resultLabel"></h3>
+      <p id="resultDetails"></p>
+    </div>
   </div>
 
 </main>
@@ -56,6 +75,3 @@
 <script src="script.js" defer></script>
 </body>
 </html>
-<!--TODO: fix the upload image button on the dropzone, add phase in button to the link send, make the analyze button actually clickable-->
-<!--TODO: revise data sending to gateway later-->
-<!--minor todo: umm lol revise the username and make it prettier i guess?-->
