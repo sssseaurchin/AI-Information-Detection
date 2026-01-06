@@ -49,3 +49,5 @@ def get_ai_score(text: str) -> float:
     except Exception as e:
         print(f"ERROR during prediction: {e}")
         return -1.0
+
+
