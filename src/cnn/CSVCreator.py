@@ -27,11 +27,11 @@ def create_csv(data_path:str, output_csv_name:str="dataset.csv") -> None:
         
         for category in categories:
             category_path = os.path.join(data_path, category)
-            if category!= "_unsorted":
+            if category != "_unsorted":
                 for image_name in os.listdir(category_path):
                     if image_name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
                         writer.writerow([image_name, category])
-                else:
-                    pass # Skip _unsorted folder        
+            else:
+                pass # Skip _unsorted folder        
 
     print(f"CSV created: {output_csv_name} at {csv_path}")

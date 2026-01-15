@@ -1,5 +1,11 @@
-from cnnModel import train_model, predict_image
-from CSVCreator import create_csv
+try:
+    # Relative import (when run as module: python3 -m cnn.main)
+    from .cnnModel import train_model, predict_image
+    from .CSVCreator import create_csv
+except ImportError:
+    # Absolute import (when run as script: python3 main.py)
+    from cnnModel import train_model, predict_image
+    from CSVCreator import create_csv
 import os
 
 def main():
