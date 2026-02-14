@@ -24,6 +24,49 @@ def preprocess_regular(path, label, image_size):
         
     return img, label
 
+# TODO covariance matrix
+def preprocess_sobel_edge(path, label, image_size):
+    img_bytes = tf.io.read_file(path)
+    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
+    img = tf.ensure_shape(img, [None, None, 3])
+    img = tf.cast(img, tf.float32)
+
+    # Convert to grayscale
+    img = tf.image.rgb_to_grayscale(img)
+
+    # Add batch dimension
+    img = tf.expand_dims(img, 0)
+
+    # Sobel edges
+    sobel = tf.image.sobel_edges(img)  # [1, H, W, 1, 2]
+
+    gradient_y = sobel[..., 0]
+    gradient_x = sobel[..., 1]
+
+    # Gradient magnitude
+    edges = tf.sqrt(tf.cast(tf.square(gradient_x), tf.float32) + tf.cast(tf.square(gradient_y), tf.float32))
+
+    # Remove batch + channel dims
+    edges = tf.squeeze(edges, axis=[0, -1])
+
+    # Normalize
+    edges = edges / (tf.reduce_max(edges) + 1e-7)
+
+    # Resize
+    edges = tf.image.resize(
+        tf.expand_dims(edges, -1),
+        image_size,
+        method='bilinear',
+        antialias=True
+    )
+
+    edges = tf.squeeze(edges, axis=-1)
+    
+    # Stack the single channel 3 times to match expected input shape (224, 224, 3)
+    edges = tf.stack([edges, edges, edges], axis=-1)
+
+    return edges, label
+
 def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
     model = models.Sequential([
@@ -69,7 +112,7 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) ->
 def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, validation_split: float = 0.2, 
                 use_cache: bool = True, cache_in_memory: bool = False, 
                 use_mixed_precision: bool = True, enable_augmentation: bool = False,
-                model_save_path: str = None) -> tuple[tf.keras.Model, callbacks.History]:
+                model_save_path: str = "", preprocess_func: Callable = preprocess_regular, image_size: tuple = (224, 224)) -> tuple[tf.keras.Model, callbacks.History]:
     # Train the CNN model for AI-generated image detection - returns trained model and training history
     
     # Enable mixed precision for faster training on GPU
@@ -131,35 +174,13 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         
         return img, label
     
-    def load_and_preprocess_image(path, label):
-        # Load and preprocess image using pure TensorFlow ops (GPU-accelerated) with error handling - reads file, decodes, resizes and normalizes
-        # Read image file
-        img_bytes = tf.io.read_file(path)
-        
-        # Decode image (handles JPEG, PNG, BMP, GIF)
-        img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
-        
-        # Ensure image has 3 dimensions
-        img = tf.ensure_shape(img, [None, None, 3])
-        
-        # Resize to target size
-        img = tf.image.resize(img, (224, 224), method='bilinear', antialias=True)
-        
-        # Normalize to [0, 1]
-        img = tf.cast(img, tf.float32) / 255.0
-        
-        # Ensure shape is correct
-        img.set_shape((224, 224, 3))
-        
-        return img, label
-    
     # Create train dataset with optimized pipeline
     train_dataset = tf.data.Dataset.from_tensor_slices((train_paths, train_labels))
     
     # Map: Load and preprocess images (GPU-accelerated, parallel)
     # Ignore errors for corrupt images (skip them instead of crashing)
     train_dataset = train_dataset.map(
-        load_and_preprocess_image, 
+        lambda path, label: preprocess_func(path, label, image_size), 
         num_parallel_calls=tf.data.AUTOTUNE,
         deterministic=False
     )
@@ -201,7 +222,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     
     # Map: Load and preprocess images (GPU-accelerated, parallel)
     val_dataset = val_dataset.map(
-        load_and_preprocess_image,
+        lambda path, label: preprocess_func(path, label, image_size),
         num_parallel_calls=tf.data.AUTOTUNE,
         deterministic=False
     )
@@ -233,19 +254,13 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     
     # Configure optimizer with learning rate
     initial_learning_rate = 0.001
-    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-        initial_learning_rate=initial_learning_rate,
-        decay_steps=1000,
-        decay_rate=0.96,
-        staircase=True
-    )
-    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=initial_learning_rate)
     
     # Compile model
     # Mixed precision works fine with string loss, but using class is more explicit
     model.compile(
         optimizer=optimizer,
-        loss=tf.keras.losses.CategoricalCrossentropy(),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(), # I have no idea how to change this without breaking everythin
         metrics=['accuracy']
     )
     
@@ -263,7 +278,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     callback_list.append(early_stopping)
     
     # Model checkpointing
-    if model_save_path:
+    if model_save_path and model_save_path != "":
         checkpoint_dir = os.path.dirname(model_save_path)
         if checkpoint_dir and not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir, exist_ok=True)
@@ -286,7 +301,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         validation_data=val_dataset,
         epochs=epochs,
         callbacks=callback_list,
-        verbose=1
+        verbose="1"
     )
     
     # Reset mixed precision policy if it was enabled
@@ -312,13 +327,13 @@ def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (2
     img = tf.image.resize(img, image_size, method='bilinear', antialias=True)
     
     # Normalize to [0, 1]
-    img = tf.cast(img, tf.float32) / 255.0
+    img = tf.cast(img, tf.float32) / tf.constant(255.0)
     
     # Add batch dimension
     img = tf.expand_dims(img, axis=0)
     
     # Make prediction
-    predictions = model.predict(img, verbose=0)
+    predictions = model.predict(img, verbose="2")
     confidence = float(predictions[0][1])  # Confidence for AI-generated class
     
     return confidence
