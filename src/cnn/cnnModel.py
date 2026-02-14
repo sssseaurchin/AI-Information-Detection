@@ -3,73 +3,26 @@ from tensorflow.keras import layers, models, callbacks  # type: ignore[import]
 import numpy as np
 import pandas as pd
 import os 
+from typing import Callable
 
-def build_ds_from_csv(dataset_path: str, csv_name: str, batch_size: int = 32, shuffle: bool = True, 
-                     image_size: tuple = (224, 224), use_cache: bool = False) -> tf.data.Dataset: 
-    # Build a TensorFlow dataset from CSV file with optimized pipeline - returns tf.data.Dataset ready for training
-    csv_path = os.path.join(dataset_path, csv_name)
-    dataframe = pd.read_csv(csv_path)
-    
-    # Collect paths and labels efficiently using list comprehension
-    paths = [
-        os.path.join(dataset_path, row['category'], row['image_name'])
-        for _, row in dataframe.iterrows()
-    ]
-    labels = [
-        1 if row['category'] == 'fake' else 0
-        for _, row in dataframe.iterrows()
-    ]
-    
-    # Convert to numpy arrays for better memory efficiency
-    paths = np.array(paths)
-    labels = np.array(labels)
-    
-    # Create dataset from paths and labels
-    dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
-    
-    def load_and_preprocess_image(path, label):
-        # Load and preprocess image with error handling - reads file, decodes, resizes and normalizes to [0,1]
-        # Read image file
-        img_bytes = tf.io.read_file(path)
+def preprocess_regular(path, label, image_size):
+    # Load and preprocess image with error handling - reads file, decodes, resizes and normalizes to [0,1]
+    # Read image file
+    img_bytes = tf.io.read_file(path)
+     
+    # Decode image (handles JPEG, PNG, BMP, GIF)
+    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
         
-        # Decode image (handles JPEG, PNG, BMP, GIF)
-        img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
+    # Ensure image has 3 dimensions
+    img = tf.ensure_shape(img, [None, None, 3])
         
-        # Ensure image has 3 dimensions
-        img = tf.ensure_shape(img, [None, None, 3])
+    # Resize to target size
+    img = tf.image.resize(img, image_size, method='bilinear', antialias=True)
         
-        # Resize to target size
-        img = tf.image.resize(img, image_size, method='bilinear', antialias=True)
+    # Normalize to [0, 1]
+    img = tf.cast(img, tf.float32) / 255.0
         
-        # Normalize to [0, 1]
-        img = tf.cast(img, tf.float32) / 255.0
-        
-        return img, label
-    
-    # Map: Load and preprocess images (GPU-accelerated, parallel)
-    dataset = dataset.map(
-        load_and_preprocess_image, 
-        num_parallel_calls=tf.data.AUTOTUNE,
-        deterministic=False
-    )
-    
-    # Filter out invalid images
-    dataset = dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
-    
-    # Shuffle if requested
-    if shuffle:
-        dataset = dataset.shuffle(buffer_size=min(1024, len(paths)))
-    
-    # Batch and prefetch
-    dataset = dataset.batch(batch_size, drop_remainder=False)
-    
-    # Cache in memory if requested
-    if use_cache:
-        dataset = dataset.cache()
-    
-    dataset = dataset.prefetch(tf.data.AUTOTUNE)
-    
-    return dataset
+    return img, label
 
 def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
@@ -106,7 +59,7 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) ->
         layers.Flatten(),
         layers.Dense(512),
         layers.BatchNormalization(),
-        layers.Activation('relu'),
+        layers.Activation('tanh'),
         layers.Dropout(0.5),
         layers.Dense(num_classes, activation='softmax')
     ])
@@ -292,7 +245,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Mixed precision works fine with string loss, but using class is more explicit
     model.compile(
         optimizer=optimizer,
-        loss='sparse_categorical_crossentropy',
+        loss=tf.keras.losses.CategoricalCrossentropy(),
         metrics=['accuracy']
     )
     
@@ -302,7 +255,8 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Early stopping to prevent overfitting
     early_stopping = callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=5,
+        min_delta=0.001,
+        patience=1,
         restore_best_weights=True,
         verbose=1
     )
