@@ -45,7 +45,7 @@ def preprocess_sobel_edge(path, label, image_size):
 
     # Gradient magnitude
     edges = tf.sqrt(tf.square(dx) + tf.square(dy))  # type: ignore
-
+    
     # Remove batch + channel dims
     edges = tf.squeeze(edges, axis=[0, -1])  # Remove batch and channel dimensions
     
@@ -310,30 +310,37 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     
     return model, history
 
-def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224)) -> float:
+def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224), preprocessing_func: Callable = preprocess_regular) -> float:
     # Predict if an image is AI-generated or real using TensorFlow ops (GPU-accelerated) - returns confidence score 0.0 to 1.0
     # Check if file exists
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image file not found: {image_path}")
     
-    # Load and preprocess image using TensorFlow ops
-    img_bytes = tf.io.read_file(image_path)
-    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
-    
-    # Ensure image has correct shape
-    img = tf.ensure_shape(img, [None, None, 3])
-    
-    # Resize to target size
-    img = tf.image.resize(img, image_size, method='bilinear', antialias=True)
-    
-    # Normalize to [0, 1]
-    img = tf.cast(img, tf.float32) / tf.constant(255.0)
-    
-    # Add batch dimension
-    img = tf.expand_dims(img, axis=0)
-    
-    # Make prediction
-    predictions = model.predict(img, verbose="2")
-    confidence = float(predictions[0][1])  # Confidence for AI-generated class
-    
+    img = preprocessing_func(image_path, label=0, image_size=image_size)[0]  # Get preprocessed image tensor
+
+    # Ensure we have a batch dimension: model expects (batch, h, w, c)
+    if len(img.shape) == 3:
+        img = tf.expand_dims(img, 0)
+
+    # Convert to numpy if possible (eager mode), otherwise pass the tensor
+    try:
+        img_input = img.numpy()
+    except Exception:
+        img_input = img
+
+    # Make prediction (use integer verbose)
+    predictions = model.predict(img_input, verbose=0)
+
+    # Extract confidence for AI-generated class (assumes 2-class softmax)
+    try:
+        confidence = float(predictions[0][1])
+    except Exception:
+        # Fallback: if predictions shape unexpected, try a safe conversion
+        preds = np.asarray(predictions)
+        if preds.ndim == 1 and preds.size >= 2:
+            confidence = float(preds[1])
+        else:
+            # As a last resort, return the max class probability
+            confidence = float(np.max(preds))
+
     return confidence
