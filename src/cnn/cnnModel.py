@@ -20,7 +20,7 @@ def preprocess_regular(path, label, image_size):
     img = tf.image.resize(img, image_size, method='bilinear', antialias=True)
         
     # Normalize to [0, 1]
-    img = tf.cast(img, tf.float32) / 255.0
+    img = tf.cast(img, tf.float32) / tf.constant(255.0) 
         
     return img, label
 
@@ -32,33 +32,28 @@ def preprocess_sobel_edge(path, label, image_size):
     img = tf.cast(img, tf.float32)
 
     # Convert to grayscale
-    img = tf.image.rgb_to_grayscale(img)
+    img = tf.image.rgb_to_grayscale(img) # [w, h, 3] -> [w, h, 1]
 
     # Add batch dimension
-    img = tf.expand_dims(img, 0)
+    img = tf.expand_dims(img, 0) # [w, h, 1] -> [1, w, h, 1]
 
     # Sobel edges
-    sobel = tf.image.sobel_edges(img)  # [1, H, W, 1, 2]
-
-    gradient_y = sobel[..., 0]
-    gradient_x = sobel[..., 1]
+    sobel = tf.image.sobel_edges(img) 
+    
+    dy = sobel[..., 0]
+    dx = sobel[..., 1]
 
     # Gradient magnitude
-    edges = tf.sqrt(tf.cast(tf.square(gradient_x), tf.float32) + tf.cast(tf.square(gradient_y), tf.float32))
+    edges = tf.sqrt(tf.square(dx) + tf.square(dy))  # type: ignore
 
     # Remove batch + channel dims
-    edges = tf.squeeze(edges, axis=[0, -1])
-
+    edges = tf.squeeze(edges, axis=[0, -1])  # Remove batch and channel dimensions
+    
     # Normalize
     edges = edges / (tf.reduce_max(edges) + 1e-7)
 
     # Resize
-    edges = tf.image.resize(
-        tf.expand_dims(edges, -1),
-        image_size,
-        method='bilinear',
-        antialias=True
-    )
+    edges = tf.image.resize(tf.expand_dims(edges, -1),image_size,method='bilinear',antialias=False)
 
     edges = tf.squeeze(edges, axis=-1)
     
@@ -102,7 +97,7 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) ->
         layers.Flatten(),
         layers.Dense(512),
         layers.BatchNormalization(),
-        layers.Activation('tanh'),
+        layers.Activation('relu'),
         layers.Dropout(0.5),
         layers.Dense(num_classes, activation='softmax')
     ])
@@ -252,9 +247,14 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Build model
     model = build_cnn_model()
     
-    # Configure optimizer with learning rate
     initial_learning_rate = 0.001
-    optimizer = tf.keras.optimizers.Adam(learning_rate=initial_learning_rate)
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        initial_learning_rate=initial_learning_rate,
+        decay_steps=1000,
+        decay_rate=0.96,
+        staircase=True
+    )
+    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
     
     # Compile model
     # Mixed precision works fine with string loss, but using class is more explicit
