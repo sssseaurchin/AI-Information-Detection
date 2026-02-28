@@ -25,6 +25,12 @@ The goal of the project is to be a tool to detect AI generated media.
 
 ---
 
+## Project Structure
+
+- `src/cnn/` contains the CNN application code, evaluation pipeline, and governance logic.
+- `docs/` contains project documentation, including [Docker usage](./docs/DOCKER_USAGE.md).
+- The repository root contains build and entrypoint files such as `Dockerfile`, `docker-compose.yml`, `Makefile`, and `run.ps1`.
+
 ## Governance Baseline
 
 `--eval-only` runs use an immutable governance baseline stored at `governance/baseline.json`.
@@ -46,6 +52,8 @@ docker compose run --rm aid python -m src.cnn.main --eval-only --override-govern
 ## How To Run (Docker-Only)
 
 Host `python` is not supported for this repo. Always run through Docker.
+
+Detailed usage notes are in [docs/DOCKER_USAGE.md](./docs/DOCKER_USAGE.md).
 
 ```bash
 docker compose build aid
