@@ -55,7 +55,8 @@ def main():
         enable_augmentation=False,  # Set True to enable data augmentation
         model_save_path=model_path,  # Save best model during training
         preprocess_func=preprocess_regular,
-        image_size=(224, 224)  # Set image size for preprocessing
+        image_size=(224, 224),  # Set image size for preprocessing
+        enable_early_stopping=True, 
     )
     
     # Save the trained model

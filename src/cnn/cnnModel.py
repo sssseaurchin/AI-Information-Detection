@@ -24,7 +24,7 @@ def preprocess_regular(path, label, image_size):
         
     return img, label
 
-# TODO covariance matrix
+
 def preprocess_sobel_edge(path, label, image_size):
     img_bytes = tf.io.read_file(path)
     img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
@@ -61,6 +61,39 @@ def preprocess_sobel_edge(path, label, image_size):
     edges = tf.stack([edges, edges, edges], axis=-1)
 
     return edges, label
+
+
+def get_covariance_matrix(path: str) -> tuple[tf.Tensor, tf.Tensor]:
+    """Returns a [2,2] tf.Tensor of sobel edge covariants for given image.
+
+    Args:
+        path (_str_): _Path to image file_
+
+    Returns:
+        tuple[tf.Tensor, tf.Tensor]: _A [2,2] covariance matrix of the given image_
+    """
+    
+    img_bytes = tf.io.read_file(path)
+    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
+    img = tf.ensure_shape(img, [None, None, 3])
+    img = tf.cast(img, tf.float32)
+    
+    luminance = tf.cast(0.2126 * img[..., 0] + 0.7152 * img[..., 1] + 0.0722 * img[..., 2], tf.float32) # [x, y]
+    
+    sobel = tf.image.sobel_edges(tf.expand_dims(luminance))
+    
+    Gx = sobel[..., 0]
+    Gy = sobel[..., 1]
+    
+    Gx_flat = tf.reshape(Gx, [-1])
+    Gy_flat = tf.reshape(Gy, [-1])    
+    
+    M = tf.stack([Gx_flat, Gy_flat], axis=1)  # shape [N, 2]
+    
+    N = tf.cast(tf.shape(M)[0], tf.float32)
+    C = tf.matmul(M, M, transpose_a=True) / N # shape [2, 2] Covariance matrix
+    
+    return C
 
 def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
@@ -107,7 +140,8 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) ->
 def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, validation_split: float = 0.2, 
                 use_cache: bool = True, cache_in_memory: bool = False, 
                 use_mixed_precision: bool = True, enable_augmentation: bool = False,
-                model_save_path: str = "", preprocess_func: Callable = preprocess_regular, image_size: tuple = (224, 224)) -> tuple[tf.keras.Model, callbacks.History]:
+                model_save_path: str = "", preprocess_func: Callable = preprocess_regular, image_size: tuple = (224, 224),
+                enable_early_stopping = True) -> tuple[tf.keras.Model, callbacks.History]:
     # Train the CNN model for AI-generated image detection - returns trained model and training history
     
     # Enable mixed precision for faster training on GPU
@@ -268,14 +302,15 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     callback_list = []
     
     # Early stopping to prevent overfitting
-    early_stopping = callbacks.EarlyStopping(
-        monitor='val_loss',
-        min_delta=0.001,
-        patience=1,
-        restore_best_weights=True,
-        verbose=1
-    )
-    callback_list.append(early_stopping)
+    if enable_early_stopping:
+        early_stopping = callbacks.EarlyStopping(
+            monitor='val_loss',
+            min_delta=0.001,
+            patience=1,
+            restore_best_weights=True,
+            verbose=1
+        )
+        callback_list.append(early_stopping)
     
     # Model checkpointing
     if model_save_path and model_save_path != "":
