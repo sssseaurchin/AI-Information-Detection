@@ -1,6 +1,8 @@
 from cnnModel import train_model, predict_image
 from CSVCreator import create_csv
 import os
+from cnnModel import preprocess_sobel_edge
+from cnnModel import preprocess_regular
 
 def main():
     # Path to dataset CSV
@@ -51,7 +53,9 @@ def main():
         cache_in_memory=False,  # Set to True if dataset fits in memory
         use_mixed_precision=True,  # Enable mixed precision for faster GPU training
         enable_augmentation=False,  # Set True to enable data augmentation
-        model_save_path=model_path  # Save best model during training
+        model_save_path=model_path,  # Save best model during training
+        preprocess_func=preprocess_regular,
+        image_size=(224, 224)  # Set image size for preprocessing
     )
     
     # Save the trained model
