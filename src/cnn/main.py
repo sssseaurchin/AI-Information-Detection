@@ -1,10 +1,101 @@
 from cnnModel import train_model, predict_image
 from CSVCreator import create_csv
 import os
+import argparse
 from cnnModel import preprocess_sobel_edge
 from cnnModel import preprocess_regular
+from label_config import get_default_label_config_path, load_label_mapping
+from preprocessing import get_default_preprocess_mode
+from split_utils import get_default_manifest_path, load_manifest_dataframe
+from eval_runner import run_evaluation
+from governance import (
+    append_access_log,
+    finalize_access_record,
+    evaluate_governance_request,
+    get_default_governance_config_path,
+    load_governance_config,
+    select_tuning_split_from_policy,
+)
+import hashlib
+import json
+import pandas as pd
+import sys
+
+SEED = 42
+
+
+def parse_args():
+    """Keep the existing entrypoint but allow explicit split regeneration and label handling."""
+    parser = argparse.ArgumentParser(description="Train the CNN-based AI image detector.")
+    parser.add_argument("--regen-split", action="store_true", help="Regenerate the split manifest instead of reusing it.")
+    parser.add_argument("--allow-unknown", action="store_true", help="Skip dataset categories missing from the label config.")
+    parser.add_argument("--seed", type=int, default=SEED, help="Deterministic seed used for split generation.")
+    parser.add_argument(
+        "--preprocess-mode",
+        default=get_default_preprocess_mode(),
+        choices=["rgb", "sobel", "rgb+sobel"],
+        help="Shared preprocessing mode used by training and inference.",
+    )
+    parser.add_argument(
+        "--label-config",
+        default=get_default_label_config_path(),
+        help="Path to the explicit category-to-label mapping file.",
+    )
+    parser.add_argument(
+        "--split-manifest",
+        default=get_default_manifest_path(),
+        help="Path to the frozen split manifest CSV.",
+    )
+    parser.add_argument("--eval-only", action="store_true", help="Skip training and run evaluation on a saved model.")
+    parser.add_argument(
+        "--eval-split",
+        default="val",
+        choices=["train", "val", "test", "real_world"],
+        help="Manifest split to evaluate.",
+    )
+    parser.add_argument("--dataset-id", default=None, help="Optional dataset_id subset filter applied within the chosen manifest split.")
+    parser.add_argument("--domain", default=None, help="Optional domain subset filter applied within the chosen manifest split.")
+    parser.add_argument(
+        "--threshold-policy",
+        default="youden",
+        choices=["youden", "f1", "fixed"],
+        help="Validation-only threshold selection policy.",
+    )
+    parser.add_argument("--fixed-threshold", type=float, default=None, help="Threshold used when --threshold-policy=fixed.")
+    parser.add_argument(
+        "--calibrate",
+        default="none",
+        choices=["none", "temp_scaling"],
+        help="Calibration method fitted on validation or calibration split only.",
+    )
+    parser.add_argument("--report-dir", default="reports", help="Directory used for JSON and markdown evaluation reports.")
+    parser.add_argument(
+        "--forbid-test-tuning",
+        default=True,
+        type=lambda value: str(value).lower() not in {"0", "false", "no"},
+        help="Raise if evaluation would tune threshold or temperature on test or real_world.",
+    )
+    parser.add_argument(
+        "--model-path",
+        default=None,
+        help="Path to a trained model file for --eval-only. Defaults to src/cnn/model/ai_detection_model.h5.",
+    )
+    parser.add_argument(
+        "--governance-config",
+        default=get_default_governance_config_path(),
+        help="Path to the machine-readable model selection governance config.",
+    )
+    parser.add_argument("--override-governance", action="store_true", help="Allow evaluation past governance limits and mark the run invalid for thesis reporting.")
+    parser.add_argument("--user-id", default="unknown", help="Identifier recorded in the held-out access log.")
+    return parser.parse_args()
+
+
+def _hash_label_mapping(label_mapping: dict[str, int]) -> str:
+    payload = json.dumps(label_mapping, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 def main():
+    args = parse_args()
     # Path to dataset CSV
     csv_name = 'dataset.csv'
     
@@ -23,6 +114,8 @@ def main():
         dataset_path = os.path.abspath(dataset_path)
     
     print(f"Dataset path: {dataset_path}")
+    print(f"Split manifest path: {args.split_manifest}")
+    print(f"Label config path: {args.label_config}")
     
     # Verify dataset path exists
     if not os.path.exists(dataset_path):
@@ -40,6 +133,65 @@ def main():
         print("CSV file not found.")
         print("Creating CSV from dataset...")
         create_csv(data_path=dataset_path, output_csv_name=csv_name) 
+
+    label_mapping = load_label_mapping(args.label_config)
+
+    if args.eval_only:
+        governance_config = load_governance_config(args.governance_config)
+        manifest = load_manifest_dataframe(args.split_manifest)
+        tuning_split = select_tuning_split_from_policy(
+            manifest,
+            governance_config["tuning_split_preference"],
+            args.eval_split,
+        )
+        governance_result = evaluate_governance_request(
+            governance_config=governance_config,
+            governance_config_path=args.governance_config,
+            manifest_path=args.split_manifest,
+            label_mapping_hash=_hash_label_mapping(label_mapping),
+            eval_split=args.eval_split,
+            tuning_split=tuning_split,
+            model_path=args.model_path or model_path,
+            user_id=args.user_id,
+            subset={"dataset_id": args.dataset_id, "domain": args.domain},
+            threshold_policy=args.threshold_policy,
+            calibrate_mode=args.calibrate,
+            forbid_test_tuning=args.forbid_test_tuning,
+            override_governance=args.override_governance,
+        )
+
+        if not governance_result["allowed"]:
+            append_access_log(governance_result["record"], governance_result["access_log_path"])
+            print(f"Governance blocked evaluation: {governance_result['reason']}")
+            sys.exit(2)
+
+        report = run_evaluation(
+            model_path=args.model_path or model_path,
+            manifest_path=args.split_manifest,
+            split_name=args.eval_split,
+            preprocess_mode=args.preprocess_mode,
+            label_config_path=args.label_config,
+            threshold_policy=args.threshold_policy,
+            fixed_threshold=args.fixed_threshold,
+            calibrate=args.calibrate,
+            report_dir=args.report_dir,
+            seed=args.seed,
+            dataset_id=args.dataset_id,
+            domain=args.domain,
+            tuning_split_preference=governance_config["tuning_split_preference"],
+            governance_result=governance_result,
+            forbid_test_tuning=args.forbid_test_tuning,
+        )
+        allowed_record = finalize_access_record(
+            governance_result,
+            user_id=args.user_id,
+            run_id=report["run_id"],
+            artifacts=report.get("artifacts"),
+        )
+        append_access_log(allowed_record, governance_result["access_log_path"])
+        print(f"Evaluation report saved to: {report['artifacts']['metrics_json']}")
+        print(f"Evaluation summary saved to: {report['artifacts']['summary_md']}")
+        return
     
     print("Starting CNN training for AI-generated image detection...")
     
@@ -54,8 +206,13 @@ def main():
         use_mixed_precision=True,  # Enable mixed precision for faster GPU training
         enable_augmentation=False,  # Set True to enable data augmentation
         model_save_path=model_path,  # Save best model during training
-        preprocess_func=preprocess_regular,
-        image_size=(224, 224)  # Set image size for preprocessing
+        preprocess_mode=args.preprocess_mode,
+        image_size=(224, 224),  # Set image size for preprocessing
+        label_mapping=label_mapping,
+        seed=args.seed,
+        split_manifest_path=args.split_manifest,
+        regen_split=args.regen_split,
+        allow_unknown=args.allow_unknown,
     )
     
     # Save the trained model

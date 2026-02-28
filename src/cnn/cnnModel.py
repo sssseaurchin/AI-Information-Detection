@@ -4,63 +4,17 @@ import numpy as np
 import pandas as pd
 import os 
 from typing import Callable
+from preprocessing import get_preprocess_fn
+from split_utils import load_or_create_split_manifest
 
 def preprocess_regular(path, label, image_size):
-    # Load and preprocess image with error handling - reads file, decodes, resizes and normalizes to [0,1]
-    # Read image file
-    img_bytes = tf.io.read_file(path)
-     
-    # Decode image (handles JPEG, PNG, BMP, GIF)
-    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
-        
-    # Ensure image has 3 dimensions
-    img = tf.ensure_shape(img, [None, None, 3])
-        
-    # Resize to target size
-    img = tf.image.resize(img, image_size, method='bilinear', antialias=True)
-        
-    # Normalize to [0, 1]
-    img = tf.cast(img, tf.float32) / tf.constant(255.0) 
-        
-    return img, label
+    """Compatibility wrapper around the shared RGB preprocessing path."""
+    return get_preprocess_fn("rgb")(path, label, image_size)
 
 # TODO covariance matrix
 def preprocess_sobel_edge(path, label, image_size):
-    img_bytes = tf.io.read_file(path)
-    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
-    img = tf.ensure_shape(img, [None, None, 3])
-    img = tf.cast(img, tf.float32)
-
-    # Convert to grayscale
-    img = tf.image.rgb_to_grayscale(img) # [w, h, 3] -> [w, h, 1]
-
-    # Add batch dimension
-    img = tf.expand_dims(img, 0) # [w, h, 1] -> [1, w, h, 1]
-
-    # Sobel edges
-    sobel = tf.image.sobel_edges(img) 
-    
-    dy = sobel[..., 0]
-    dx = sobel[..., 1]
-
-    # Gradient magnitude
-    edges = tf.sqrt(tf.square(dx) + tf.square(dy))  # type: ignore
-    
-    # Remove batch + channel dims
-    edges = tf.squeeze(edges, axis=[0, -1])  # Remove batch and channel dimensions
-    
-    # Normalize
-    edges = edges / (tf.reduce_max(edges) + 1e-7)
-
-    # Resize
-    edges = tf.image.resize(tf.expand_dims(edges, -1),image_size,method='bilinear',antialias=False)
-
-    edges = tf.squeeze(edges, axis=-1)
-    
-    # Stack the single channel 3 times to match expected input shape (224, 224, 3)
-    edges = tf.stack([edges, edges, edges], axis=-1)
-
-    return edges, label
+    """Compatibility wrapper around the shared Sobel preprocessing path."""
+    return get_preprocess_fn("sobel")(path, label, image_size)
 
 def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
@@ -107,8 +61,14 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) ->
 def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, validation_split: float = 0.2, 
                 use_cache: bool = True, cache_in_memory: bool = False, 
                 use_mixed_precision: bool = True, enable_augmentation: bool = False,
-                model_save_path: str = "", preprocess_func: Callable = preprocess_regular, image_size: tuple = (224, 224)) -> tuple[tf.keras.Model, callbacks.History]:
+                model_save_path: str = "", preprocess_func: Callable | None = None,
+                image_size: tuple = (224, 224), preprocess_mode: str = "rgb",
+                label_mapping: dict[str, int] | None = None, seed: int = 42,
+                split_manifest_path: str = "", regen_split: bool = False,
+                allow_unknown: bool = False) -> tuple[tf.keras.Model, callbacks.History]:
     # Train the CNN model for AI-generated image detection - returns trained model and training history
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
     
     # Enable mixed precision for faster training on GPU
     if use_mixed_precision:
@@ -126,32 +86,29 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         except RuntimeError as e:
             print(f"GPU configuration error: {e}")
     
-    csv_path = os.path.join(dataset_path, "dataset.csv")
-    dataframe = pd.read_csv(csv_path)
-    
-    # Collect paths and labels efficiently (using list comprehension for better memory)
-    paths = [
-        os.path.join(dataset_path, row['category'], row['image_name'])
-        for _, row in dataframe.iterrows()
-    ]
-    labels = [
-        1 if row['category'] == 'fake' else 0
-        for _, row in dataframe.iterrows()
-    ]
-    
-    # Split into train and validation
-    num_samples = len(paths)
-    indices = np.arange(num_samples)
-    np.random.shuffle(indices)
-    val_size = int(num_samples * validation_split)
-    train_indices = indices[val_size:]
-    val_indices = indices[:val_size]
-    
-    # Use numpy arrays for more efficient memory usage
-    train_paths = np.array(paths)[train_indices]
-    train_labels = np.array(labels)[train_indices]
-    val_paths = np.array(paths)[val_indices]
-    val_labels = np.array(labels)[val_indices]
+    if label_mapping is None:
+        raise ValueError("train_model requires an explicit label_mapping.")
+
+    preprocess_callable = preprocess_func or get_preprocess_fn(preprocess_mode)
+    manifest, manifest_path = load_or_create_split_manifest(
+        dataset_path=dataset_path,
+        label_mapping=label_mapping,
+        validation_split=validation_split,
+        seed=seed,
+        manifest_path=split_manifest_path or None,
+        regen_split=regen_split,
+        allow_unknown=allow_unknown,
+    )
+
+    usable_manifest = manifest[(manifest["split"].isin(["train", "val"])) & (manifest["label"] >= 0)].copy()
+    train_frame = usable_manifest[usable_manifest["split"] == "train"]
+    val_frame = usable_manifest[usable_manifest["split"] == "val"]
+
+    train_paths = train_frame["path"].to_numpy()
+    train_labels = train_frame["label"].astype(int).to_numpy()
+    val_paths = val_frame["path"].to_numpy()
+    val_labels = val_frame["label"].astype(int).to_numpy()
+    num_samples = len(usable_manifest)
     
     def augment_image(img, label):
         # Apply data augmentation to image - random flip, brightness and contrast adjustments
@@ -175,7 +132,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Map: Load and preprocess images (GPU-accelerated, parallel)
     # Ignore errors for corrupt images (skip them instead of crashing)
     train_dataset = train_dataset.map(
-        lambda path, label: preprocess_func(path, label, image_size), 
+        lambda path, label: preprocess_callable(path, label, image_size), 
         num_parallel_calls=tf.data.AUTOTUNE,
         deterministic=False
     )
@@ -183,7 +140,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Filter out any invalid images (shape mismatches, etc.)
     # Note: Corrupt JPEG files will be caught by decode_jpeg and cause an error
     # We need to handle this at the dataset level
-    train_dataset = train_dataset.filter(lambda img, label: tf.shape(img)[0] == 224)
+    train_dataset = train_dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
     
     # Ignore errors for corrupt images - skip them instead of crashing
     train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
@@ -207,7 +164,11 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
                 print("Warning: Dataset too large for disk cache, skipping cache for better performance")
                 
     # Shuffle: Randomize order (after cache for efficiency)
-    train_dataset = train_dataset.shuffle(buffer_size=min(1024, len(train_paths)), reshuffle_each_iteration=True) #TODO Change buffer size?
+    train_dataset = train_dataset.shuffle(
+        buffer_size=min(1024, len(train_paths)),
+        seed=seed,
+        reshuffle_each_iteration=True,
+    ) #TODO Change buffer size?
     
     # Prefetch: Prepare next batch while GPU is training
     train_dataset = train_dataset.prefetch(tf.data.AUTOTUNE)
@@ -217,13 +178,13 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     
     # Map: Load and preprocess images (GPU-accelerated, parallel)
     val_dataset = val_dataset.map(
-        lambda path, label: preprocess_func(path, label, image_size),
+        lambda path, label: preprocess_callable(path, label, image_size),
         num_parallel_calls=tf.data.AUTOTUNE,
         deterministic=False
     )
     
     # Filter out any invalid images
-    val_dataset = val_dataset.filter(lambda img, label: tf.shape(img)[0] == 224)
+    val_dataset = val_dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
     
     # Ignore errors for corrupt images
     val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
@@ -293,8 +254,9 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         callback_list.append(model_checkpoint)
     
     # Train model
-    print(f"\nTraining with {len(train_paths)} training samples and {len(val_paths)} validation samples")
-    print(f"Batch size: {batch_size}, Epochs: {epochs}\n")
+    print(f"\nUsing split manifest: {manifest_path}")
+    print(f"Training with {len(train_paths)} training samples and {len(val_paths)} validation samples")
+    print(f"Batch size: {batch_size}, Epochs: {epochs}, Seed: {seed}, Preprocessing: {preprocess_mode}\n")
     
     history = model.fit(
         train_dataset,
@@ -310,13 +272,15 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     
     return model, history
 
-def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224), preprocessing_func: Callable = preprocess_regular) -> float:
+def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224),
+                  preprocessing_func: Callable | None = None, preprocess_mode: str = "rgb") -> float:
     # Predict if an image is AI-generated or real using TensorFlow ops (GPU-accelerated) - returns confidence score 0.0 to 1.0
     # Check if file exists
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image file not found: {image_path}")
     
-    img = preprocessing_func(image_path, label=0, image_size=image_size)[0]  # Get preprocessed image tensor
+    preprocess_callable = preprocessing_func or get_preprocess_fn(preprocess_mode)
+    img = preprocess_callable(image_path, label=0, image_size=image_size)[0]  # Get preprocessed image tensor
 
     # Ensure we have a batch dimension: model expects (batch, h, w, c)
     if len(img.shape) == 3:
