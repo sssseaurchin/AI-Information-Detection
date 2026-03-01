@@ -26,6 +26,12 @@ Train:
 docker compose run --rm aid python -m src.cnn.main
 ```
 
+Train with EfficientNetB0:
+
+```powershell
+docker compose run --rm aid python -m src.cnn.main --arch efficientnet_b0 --augment
+```
+
 Eval:
 
 ```powershell
@@ -42,6 +48,12 @@ Eval with report output under the repo root:
 
 ```powershell
 docker compose run --rm aid python -m src.cnn.main --eval-only --report-dir /app/reports
+```
+
+Corruption evaluation:
+
+```powershell
+docker compose run --rm aid python -m src.cnn.corruption_eval --model-path /app/src/cnn/model/ai_detection_model.h5 --report-dir /app/reports
 ```
 
 ## Linux / macOS
@@ -58,6 +70,12 @@ Train:
 docker compose run --rm aid python -m src.cnn.main
 ```
 
+Train with EfficientNetB0:
+
+```bash
+docker compose run --rm aid python -m src.cnn.main --arch efficientnet_b0 --augment
+```
+
 Eval:
 
 ```bash
@@ -74,6 +92,12 @@ Eval with report output under the repo root:
 
 ```bash
 docker compose run --rm aid python -m src.cnn.main --eval-only --report-dir /app/reports
+```
+
+Corruption evaluation:
+
+```bash
+docker compose run --rm aid python -m src.cnn.corruption_eval --model-path /app/src/cnn/model/ai_detection_model.h5 --report-dir /app/reports
 ```
 
 ## Notes

@@ -168,7 +168,7 @@ def select_threshold(y_true: np.ndarray, y_score: np.ndarray, policy: str, fixed
 
 
 def threshold_free_metrics(y_true: np.ndarray, y_score: np.ndarray) -> dict[str, float]:
-    """Return the threshold-free metrics used in the thesis evaluation protocol."""
+    """Return the threshold-free metrics used in the research evaluation protocol."""
     return {
         "roc_auc": roc_auc_binary(y_true, y_score),
         "pr_auc": pr_auc_binary(y_true, y_score),

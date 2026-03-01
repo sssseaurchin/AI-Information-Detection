@@ -29,12 +29,24 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train the CNN-based AI image detector.")
     parser.add_argument("--regen-split", action="store_true", help="Regenerate the split manifest instead of reusing it.")
     parser.add_argument("--allow-unknown", action="store_true", help="Skip dataset categories missing from the label config.")
+    parser.add_argument("--augment", action="store_true", help="Enable stronger training-time real-world augmentations.")
     parser.add_argument("--seed", type=int, default=SEED, help="Deterministic seed used for split generation.")
+    parser.add_argument("--early-stopping-patience", type=int, default=3, help="Early stopping patience for training.")
+    parser.add_argument("--finetune-unfreeze", action="store_true", help="Enable second-stage EfficientNet backbone unfreezing.")
+    parser.add_argument("--finetune-freeze-epochs", type=int, default=3, help="Warmup epochs with frozen backbone before fine-tuning.")
+    parser.add_argument("--finetune-lr", type=float, default=1e-5, help="Learning rate used during EfficientNet fine-tuning.")
+    parser.add_argument("--finetune-weight-decay", type=float, default=1e-5, help="Weight decay used during EfficientNet fine-tuning.")
     parser.add_argument(
         "--preprocess-mode",
         default=get_default_preprocess_mode(),
         choices=["rgb", "sobel", "rgb+sobel"],
         help="Shared preprocessing mode used by training and inference.",
+    )
+    parser.add_argument(
+        "--arch",
+        default="simple",
+        choices=["simple", "efficientnet_b0"],
+        help="Single-backbone architecture used for training.",
     )
     parser.add_argument(
         "--label-config",
@@ -85,7 +97,7 @@ def parse_args():
         default=get_default_governance_config_path(),
         help="Path to the machine-readable model selection governance config.",
     )
-    parser.add_argument("--override-governance", action="store_true", help="Allow evaluation past governance limits and mark the run invalid for thesis reporting.")
+    parser.add_argument("--override-governance", action="store_true", help="Allow evaluation past governance limits and mark the run invalid for research reporting.")
     parser.add_argument("--user-id", default="unknown", help="Identifier recorded in the held-out access log.")
     return parser.parse_args()
 
@@ -204,7 +216,7 @@ def main():
         use_cache=True,  # Enable caching for faster subsequent epochs
         cache_in_memory=False,  # Set to True if dataset fits in memory
         use_mixed_precision=True,  # Enable mixed precision for faster GPU training
-        enable_augmentation=False,  # Set True to enable data augmentation
+        enable_augmentation=args.augment,
         model_save_path=model_path,  # Save best model during training
         preprocess_mode=args.preprocess_mode,
         image_size=(224, 224),  # Set image size for preprocessing
@@ -213,6 +225,12 @@ def main():
         split_manifest_path=args.split_manifest,
         regen_split=args.regen_split,
         allow_unknown=args.allow_unknown,
+        arch=args.arch,
+        early_stopping_patience=args.early_stopping_patience,
+        finetune_unfreeze=args.finetune_unfreeze,
+        finetune_freeze_epochs=args.finetune_freeze_epochs,
+        finetune_lr=args.finetune_lr,
+        finetune_weight_decay=args.finetune_weight_decay,
     )
     
     # Save the trained model

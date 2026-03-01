@@ -266,7 +266,7 @@ def run_evaluation(
     image_size: tuple[int, int] = (224, 224),
     batch_size: int = 32,
 ) -> dict[str, Any]:
-    """Run thesis-grade evaluation for a specific manifest split."""
+    """Run research-grade evaluation for a specific manifest split."""
     manifest = _load_manifest(manifest_path)
     label_mapping = load_label_mapping(label_config_path)
     label_mapping_hash = _hash_label_mapping(label_mapping)
