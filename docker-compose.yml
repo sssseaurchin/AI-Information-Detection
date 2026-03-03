@@ -1,0 +1,38 @@
+services:
+  aid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: tensorflow/tensorflow:2.15.0
+    image: aid:local
+    working_dir: /app
+    command: python3 -m main
+    environment:
+      PYTHONPATH: /app/src/cnn
+      DATASET_PATH: /app/Dataset
+    volumes:
+      - .:/app
+    ports:
+      - "5000:5000"
+
+  aid-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: tensorflow/tensorflow:2.15.0-gpu
+    image: aid:local-gpu
+    working_dir: /app
+    command: python3 -m main
+    environment:
+      PYTHONPATH: /app/src/cnn
+      DATASET_PATH: /app/Dataset
+    volumes:
+      - .:/app
+    ports:
+      - "5000:5000"
+    # Requires Docker Desktop GPU support or Docker Engine with NVIDIA Container Toolkit.
+    profiles:
+      - gpu
+    gpus: all
