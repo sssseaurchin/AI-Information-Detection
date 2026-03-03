@@ -218,19 +218,9 @@ def main():
         use_mixed_precision=True,  # Enable mixed precision for faster GPU training
         enable_augmentation=args.augment,
         model_save_path=model_path,  # Save best model during training
-        preprocess_mode=args.preprocess_mode,
+        preprocess_func=preprocess_regular,
         image_size=(224, 224),  # Set image size for preprocessing
-        label_mapping=label_mapping,
-        seed=args.seed,
-        split_manifest_path=args.split_manifest,
-        regen_split=args.regen_split,
-        allow_unknown=args.allow_unknown,
-        arch=args.arch,
-        early_stopping_patience=args.early_stopping_patience,
-        finetune_unfreeze=args.finetune_unfreeze,
-        finetune_freeze_epochs=args.finetune_freeze_epochs,
-        finetune_lr=args.finetune_lr,
-        finetune_weight_decay=args.finetune_weight_decay,
+        enable_early_stopping=True, 
     )
     
     # Save the trained model
