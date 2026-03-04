@@ -33,7 +33,7 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 
 #CONTROL PANEL
  
-data_path: Path = Path("data/data/AI_Human_cleaned.csv")
+data_path: Path = Path("data_center/data/AI_Human_cleaned.csv")
 
 max_nb_words: int = 20_000          #how many unique words does model will study
 max_sequence_length: int = 200      #put something to blank spaces and limit text to (200) sentence
