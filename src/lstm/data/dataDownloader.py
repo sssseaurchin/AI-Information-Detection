@@ -41,7 +41,9 @@ def _download_all_hugging_face():
 def _kaggle_download(handle: str, filename: str) -> Path:
     out_file = DATA_DIR / filename
 
-    # Already have a non-empty output file
+    # ensure destination directories exist (handles filename containing subfolders)
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+
     if out_file.exists() and out_file.stat().st_size > 0:
         logging.info(f"[Kaggle] Already exists, skipping: {handle}")
         return out_file
@@ -49,7 +51,7 @@ def _kaggle_download(handle: str, filename: str) -> Path:
     dataset_dir = Path(kagglehub.dataset_download(handle))
 
     # 1) Exact match
-    src_exact = dataset_dir / filename
+    src_exact = dataset_dir / Path(filename).name  # important: match by basename, not subpath
     if src_exact.exists() and src_exact.is_file():
         shutil.copy2(src_exact, out_file)
         logging.info(f"[Kaggle] Copied exact match to: {out_file}")
@@ -63,11 +65,9 @@ def _kaggle_download(handle: str, filename: str) -> Path:
 
     if not candidates:
         logging.warning(f"[Kaggle] No data files found in {dataset_dir}. Creating empty file: {out_file}")
-        out_file.parent.mkdir(parents=True, exist_ok=True)
         out_file.touch()
         return out_file
 
-    # Prefer CSVs; then prefer common names
     def score(p: Path) -> tuple:
         name = p.name.lower()
         ext_priority = {".csv": 0, ".tsv": 1, ".parquet": 2, ".jsonl": 3, ".json": 4}.get(p.suffix.lower(), 9)
@@ -76,16 +76,15 @@ def _kaggle_download(handle: str, filename: str) -> Path:
             name_priority = -2
         elif "train" in name:
             name_priority = -1
-        return (ext_priority, name_priority, p.stat().st_size * -1)
+        return (ext_priority, name_priority, -p.stat().st_size)
 
     candidates.sort(key=score)
     src = candidates[0]
 
-    # Copy the discovered file but name it as `filename` in your data folder
     shutil.copy2(src, out_file)
     logging.warning(
-        f"[Kaggle] Exact file not found ({filename}). "
-        f"Copied best match '{src.relative_to(dataset_dir)}' -> '{out_file.name}'."
+        f"[Kaggle] Exact file not found ({Path(filename).name}). "
+        f"Copied best match '{src.relative_to(dataset_dir)}' -> '{out_file}'."
     )
     return out_file
 
