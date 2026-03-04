@@ -3,6 +3,7 @@ import pandas as pd
 
 
 # Fonksiyonlar -> veriyi alıp temizleyip veri_clean.csv haline kaydeder
+# HUMAN = 0; AI = 1;    
 
 def AI_Human() -> pd.DataFrame:
     path = "data/AI_Human.csv"

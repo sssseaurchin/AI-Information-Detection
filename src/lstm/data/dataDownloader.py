@@ -7,6 +7,8 @@ from datasets import load_dataset
 import json
 
 
+# HUMAN = 0; AI = 1;    
+
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -36,23 +38,56 @@ def _download_all_hugging_face():
         _hugging_face_download(name=dic["name"])
     
 
+def _kaggle_download(handle: str, filename: str) -> Path:
+    out_file = DATA_DIR / filename
 
-def _kaggle_download(handle: str, filename: str) -> Path: 
-    
-    file = DATA_DIR / filename
-    if file.exists() and file.stat().st_size > 0: # if file exists and larger than 1 bit
+    # Already have a non-empty output file
+    if out_file.exists() and out_file.stat().st_size > 0:
         logging.info(f"[Kaggle] Already exists, skipping: {handle}")
-        return file
+        return out_file
 
     dataset_dir = Path(kagglehub.dataset_download(handle))
-    src_file = dataset_dir / filename # cache
 
-    if not src_file.exists():
-        raise FileNotFoundError(f"[Kaggle] File not found in cache: {src_file} ???")
+    # 1) Exact match
+    src_exact = dataset_dir / filename
+    if src_exact.exists() and src_exact.is_file():
+        shutil.copy2(src_exact, out_file)
+        logging.info(f"[Kaggle] Copied exact match to: {out_file}")
+        return out_file
 
-    shutil.copy2(src_file, file) # does this mean we have the downloaded files twice?
-    logging.info(f"[Kaggle] Copied to: {file}") 
-    return file
+    # 2) Auto-discover candidates
+    candidates = [
+        p for p in dataset_dir.rglob("*")
+        if p.is_file() and p.suffix.lower() in {".csv", ".tsv", ".json", ".jsonl", ".parquet"}
+    ]
+
+    if not candidates:
+        logging.warning(f"[Kaggle] No data files found in {dataset_dir}. Creating empty file: {out_file}")
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        out_file.touch()
+        return out_file
+
+    # Prefer CSVs; then prefer common names
+    def score(p: Path) -> tuple:
+        name = p.name.lower()
+        ext_priority = {".csv": 0, ".tsv": 1, ".parquet": 2, ".jsonl": 3, ".json": 4}.get(p.suffix.lower(), 9)
+        name_priority = 0
+        if name in {"train.csv", "data.csv", "dataset.csv"}:
+            name_priority = -2
+        elif "train" in name:
+            name_priority = -1
+        return (ext_priority, name_priority, p.stat().st_size * -1)
+
+    candidates.sort(key=score)
+    src = candidates[0]
+
+    # Copy the discovered file but name it as `filename` in your data folder
+    shutil.copy2(src, out_file)
+    logging.warning(
+        f"[Kaggle] Exact file not found ({filename}). "
+        f"Copied best match '{src.relative_to(dataset_dir)}' -> '{out_file.name}'."
+    )
+    return out_file
 
 def _hugging_face_download(
     name: str,
@@ -104,6 +139,7 @@ def _hugging_face_download(
 
 if __name__ == "__main__":
     print("Starting Downloader") 
+    # _kaggle_download(handle="khushu89/human-vs-ai-text-classification-dataset", filename="human-vs-ai-text-classification-dataset.csv")
     _download_all_kaggle()
-    _download_all_hugging_face()
+    # _download_all_hugging_face()
     # prayers : me
