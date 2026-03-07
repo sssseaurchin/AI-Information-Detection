@@ -169,5 +169,5 @@ def _hugging_face_download(
 if __name__ == "__main__":
     print("Starting Downloader") 
     # _kaggle_download(handle="khushu89/human-vs-ai-text-classification-dataset", filename="human-vs-ai-text-classification-dataset.csv")
-    # download_all_kaggle()
-    download_all_hugging_face()
+    download_all_kaggle()
+    # download_all_hugging_face()
