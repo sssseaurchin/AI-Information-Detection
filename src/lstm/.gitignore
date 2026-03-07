@@ -6,5 +6,6 @@
 */HC3_HUMAN_GPT
 */LLM_User_Text
 
-/data
+/data_center
+*/data
 *.h5

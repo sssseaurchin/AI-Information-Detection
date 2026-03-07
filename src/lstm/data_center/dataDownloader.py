@@ -3,7 +3,7 @@ import shutil
 import kagglehub
 import logging
 logging.basicConfig(level=logging.INFO)
-from datasets import load_dataset
+from datasets import load_dataset, Dataset, DatasetDict
 import json
 
 
@@ -15,29 +15,18 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 KAGGLE_FILE = "kaggle.json"
 HUGGING_FACE_FILE = "hugging_face.json"
 
+
+### KAGGLE
 def _list_all_kaggle() -> list[dict]:
     json_path =  Path(KAGGLE_FILE)
     with json_path.open("r", encoding="utf-8") as file:
         return json.load(file)
 
-def _list_all_hugging_face()-> list[dict]:
-    json_path =  Path(HUGGING_FACE_FILE)
-    with json_path.open("r", encoding="utf-8") as file:
-        return json.load(file)
-
-def _download_all_kaggle():
+def download_all_kaggle():
     list = _list_all_kaggle()
     
     for dic in list:
         _kaggle_download(handle=dic["handle"], filename=dic["file_name"])
-
-def _download_all_hugging_face():
-    list = _list_all_hugging_face()
-    
-    for dic in list:
-        _hugging_face_download(name=dic["name"])
-    
-
 def _kaggle_download(handle: str, filename: str) -> Path:
     out_file = DATA_DIR / filename
 
@@ -88,15 +77,30 @@ def _kaggle_download(handle: str, filename: str) -> Path:
     )
     return out_file
 
+### HUGGING FACE
+def _list_all_hugging_face()-> list[dict]:
+    json_path =  Path(HUGGING_FACE_FILE)
+    with json_path.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def download_all_hugging_face():
+    list = _list_all_hugging_face()
+    logging.info(f"Downloading from list: {list}")
+    
+    for dic in list:
+        _hugging_face_download(name=dic["name"])
+
+
 def _hugging_face_download(
     name: str,
-    save_name: str | None = None,
+    filename: str | None = None,
     subset: str | None = None,
 ) -> Path:
     hf_cache = DATA_DIR / "hf_cache"
     hf_cache.mkdir(parents=True, exist_ok=True)
 
-    out_dir_name = save_name or name.split("/")[-1]
+    out_dir_name = filename or name.split("/")[-1]
     if subset:
         out_dir_name = f"{out_dir_name}__{subset}"
     out_dir = DATA_DIR / "datasets" / out_dir_name
@@ -108,8 +112,7 @@ def _hugging_face_download(
     out_dir.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        # "subset" here is HF config name, passed as `name=...`
-        ds = load_dataset(name, name=subset, cache_dir=str(hf_cache)) if subset else \
+        dataset = load_dataset(name, name=subset, cache_dir=str(hf_cache)) if subset else \
              load_dataset(name, cache_dir=str(hf_cache))
 
     except RuntimeError as e:
@@ -120,25 +123,51 @@ def _hugging_face_download(
         logging.warning(f"[HF] Script-based dataset blocked; falling back to refs/convert/parquet: {name}")
 
         # HC3 and similar datasets store configs as folders under refs/convert/parquet (e.g., all/, finance/, ...)
-        parquet_glob = (
+        data_files = (
             f"hf://datasets/{name}@refs/convert/parquet/{subset}/**/*.parquet"
             if subset else
             f"hf://datasets/{name}@refs/convert/parquet/**/*.parquet"
         )
 
-        ds = load_dataset(
+        dataset = load_dataset(
             "parquet",
-            data_files=parquet_glob,
+            data_files=data_files,
             cache_dir=str(hf_cache),
         )
+    def __jsonify_complex_columns(ds: Dataset) -> Dataset: # yeah a function inside of a function
+        """
+        CSV can't store list/dict columns well. Convert list/dict values to JSON strings.
+        """
+        def convert_row(row):
+            for k, v in row.items():
+                if isinstance(v, (list, dict)):
+                    row[k] = json.dumps(v, ensure_ascii=False)
+            return row
 
-    ds.save_to_disk(str(out_dir))
-    logging.info(f"[HF] Saved to: {out_dir}")
+        # map is lazy-ish; this will materialize when writing
+        return ds.map(convert_row)
+    
+     # Export to CSV
+    if isinstance(dataset, DatasetDict):
+        for split, split_ds in dataset.items():
+            split_ds = __jsonify_complex_columns(split_ds)
+            csv_path = out_dir / f"{split}.csv"
+            split_ds.to_csv(str(csv_path), index=False)
+            logging.info(f"[HF] Wrote CSV: {csv_path}")
+    elif isinstance(dataset, Dataset):
+        dataset = __jsonify_complex_columns(dataset)
+        csv_path = out_dir / "data.csv"
+        dataset.to_csv(str(csv_path), index=False)
+        logging.info(f"[HF] Wrote CSV: {csv_path}")
+    else:
+        # Very rare, but keep it explicit
+        raise TypeError(f"Unexpected dataset type: {type(dataset)}")
+
+    logging.info(f"[HF] Saved CSVs to: {out_dir}")
     return out_dir
 
 if __name__ == "__main__":
     print("Starting Downloader") 
     # _kaggle_download(handle="khushu89/human-vs-ai-text-classification-dataset", filename="human-vs-ai-text-classification-dataset.csv")
-    _download_all_kaggle()
-    # _download_all_hugging_face()
-    # prayers : me
+    # download_all_kaggle()
+    download_all_hugging_face()
