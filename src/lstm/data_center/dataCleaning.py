@@ -151,10 +151,7 @@ def humanVSAIJSONL() -> list: # DEPRECATED, we don't use jsonl format
 """
 
 
-"""AI_Human()
-ai_vs_human_comparison_dataset()
+AI_Human()
+"""ai_vs_human_comparison_dataset()"""
 student_vs_AI()
-Training_Essay_Dataset()"""
-
-AI_Generated_Essays() 
-# AI_Human()
+"""Training_Essay_Dataset()"""
