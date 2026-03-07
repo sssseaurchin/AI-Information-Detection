@@ -3,11 +3,20 @@ import pandas as pd
 
 
 # Fonksiyonlar -> veriyi alıp temizleyip veri_clean.csv haline kaydeder
-# HUMAN = 0; AI = 1;    
+# temizlenen csv format: text, isGenerated (0/1)     Human = 0, AI = 1
 
 DATA_FOLDER = "data/"
+CLEANED_DATA_FOLDER = "data/cleaned/"
 
-def AI_Human() -> pd.DataFrame:
+def _save_to_disk(df: pd.DataFrame, filename: str): # removes duplicates, deletes null values and saves with filename
+    df.drop_duplicates(subset=["text", "isGenerated"], inplace=True)
+    df.dropna(subset=["text", "isGenerated"], inplace=True)
+
+    path_to_save = CLEANED_DATA_FOLDER +"cleaned_" +filename
+    df.to_csv(path_to_save, index=False)
+
+
+def AI_Human() :
     path = "data/AI_Human.csv"
     df = pd.read_csv(path)
     # df["generated"] = 1 - df["generated"] 
@@ -15,9 +24,10 @@ def AI_Human() -> pd.DataFrame:
         "Text": "text", 
         "generated": "isGenerated"
     })
-    df.to_csv("data/AI_Human_cleaned.csv", index=False)
+    # df.to_csv("data/AI_Human_cleaned.csv", index=False)
+    _save_to_disk(df, "AI_Human_cleaned.csv")
 
-def ai_vs_human_comparison_dataset() -> pd.DataFrame:
+def ai_vs_human_comparison_dataset():
     path = "data/ai-vs-human-comparison-dataset.csv"
     df = pd.read_csv(path)
 
@@ -29,15 +39,13 @@ def ai_vs_human_comparison_dataset() -> pd.DataFrame:
     df["label"] = labels.map(mapping)
 
     df = df.rename(columns={"label": "isGenerated"})
-
-    df = df.dropna(subset=["isGenerated"])
     df["isGenerated"] = df["isGenerated"].astype(int)
-    df.to_csv("data/ai_vs_human_comparison_dataset_cleaned.csv", index=False)
+ 
+    _save_to_disk(df, "ai_vs_human_comparison_dataset_cleaned.csv")
+ 
 
-    return df
 
-
-def student_vs_AI() -> pd.DataFrame:
+def student_vs_AI() :
     path = DATA_FOLDER + "student_vs_AI.csv"
 
     df = pd.read_csv(path)
@@ -54,14 +62,10 @@ def student_vs_AI() -> pd.DataFrame:
         "ai": 1
     })
 
-    # optional: drop rows that failed mapping
-    df = df.dropna(subset=["isGenerated"])
+    df["isGenerated"] = df["isGenerated"].astype(int)
+    _save_to_disk(df, "student_vs_AI_cleaned.csv")
 
-    df.to_csv("data/student_vs_AI_cleaned.csv", index=False)
-
-    return df
-
-def Training_Essay_Dataset() -> pd.DataFrame:
+def Training_Essay_Dataset() :
     path = DATA_FOLDER + "Training_Essay_Data.csv"
 
     df = pd.read_csv(path)
@@ -74,13 +78,9 @@ def Training_Essay_Dataset() -> pd.DataFrame:
 
     # ensure correct type (0/1 integers)
     df["isGenerated"] = df["isGenerated"].astype(int)
-
-    out_path = DATA_FOLDER + "Training_Essay_Data_cleaned.csv"
-    df.to_csv(out_path, index=False)
-
-    return df
-
-def AI_Generated_Essays() -> pd.DataFrame:
+    _save_to_disk(df, "Training_Essay_Data_cleaned.csv")
+ 
+def AI_Generated_Essays() :
     path = DATA_FOLDER + "AI Generated Essays Dataset.csv"
 
     df = pd.read_csv(path)
@@ -94,12 +94,9 @@ def AI_Generated_Essays() -> pd.DataFrame:
     # ensure integer labels
     df["isGenerated"] = df["isGenerated"].astype(int)
 
-    out_path = DATA_FOLDER + "AI_Generated_Essays_cleaned.csv"
-    df.to_csv(out_path, index=False)
+    _save_to_disk(df, "AI_Generated_Essays_cleaned.csv")
 
-    return df
-
-def humanVSAIJSONL() -> list: 
+def humanVSAIJSONL() -> list: # DEPRECATED, we don't use jsonl format
     jsonl_path = "dataall.jsonl"  # change path if needed
     rows = []
     with open(jsonl_path, "r", encoding="utf-8") as f:
@@ -116,11 +113,12 @@ def humanVSAIJSONL() -> list:
                 rows.append({"text": text, "is_human": "0"})
         
         # print(rows) 
-    df = pd.DataFrame(rows)
-    df.to_csv("data/all_clean.csv", index=False)
+    df = pd.DataFrame(rows) 
+
+    _save_to_disk(df, "humanVSAIJSONL_cleaned.csv")
 
 
-"""def students_vs_ai() -> pd.DataFrame:
+"""def students_vs_ai() :
     path = "data/AI_Human.csv"
     out_path = "data/AI_Human_cleaned.csv"
 
@@ -159,3 +157,4 @@ student_vs_AI()
 Training_Essay_Dataset()"""
 
 AI_Generated_Essays() 
+# AI_Human()
