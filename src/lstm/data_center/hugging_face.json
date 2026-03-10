@@ -9,11 +9,6 @@
         "subset": "all"
     },
     {
-        "url": "https://huggingface.co/datasets/sentence-transformers/eli5",
-        "name": "sentence-transformers/eli5",
-        "subset": "train"
-    },
-    {
         "url": "https://huggingface.co/datasets/silentone0725/ai-human-text-detection-v1",
         "name": "silentone0725/ai-human-text-detection-v1"
     },
