@@ -19,46 +19,64 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Tuple
 
+from data_center.datasetHandler import load_cleaned_csvs
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow.keras.layers import (
-    Dense, Embedding, LSTM, SpatialDropout1D,
-    GlobalAveragePooling1D, Conv1D, GlobalMaxPooling1D,
-    Bidirectional, GRU, Dropout
+    Dense,
+    Embedding,
+    LSTM,
+    SpatialDropout1D,
+    GlobalAveragePooling1D,
+    Conv1D,
+    GlobalMaxPooling1D,
+    Bidirectional,
+    GRU,
+    Dropout,
 )
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-#CONTROL PANEL
+# CONTROL PANEL
 
 
- 
 BASE_DIR = Path(__file__).resolve().parents[1]
 data_path: Path = BASE_DIR / "data_center" / "data" / "student_vs_AI_cleaned.csv"
 
 
-max_nb_words: int = 20_000          #how many unique words does model will study
-max_sequence_length: int = 200      #put something to blank spaces and limit text to (200) sentence
-embedding_dim: int = 100            # The number of math variables used for a word.
+max_nb_words: int = 20_000  # how many unique words does model will study
+max_sequence_length: int = (
+    200  # put something to blank spaces and limit text to (200) sentence
+)
+embedding_dim: int = 100  # The number of math variables used for a word.
 
-test_size: float = 0.2      #what percentege is test size
-random_seed: int = 0        # Locks the randomness. Ensures data splits the exact same way every time we run
+test_size: float = 0.2  # what percentege is test size
+random_seed: int = (
+    0  # Locks the randomness. Ensures data splits the exact same way every time we run
+)
 
-batch_size: int = 64        #how many example will studied before model updates its brain
-epochs: int = 1             # How many times the model will read through the ENTIRE dataset.
+batch_size: int = 64  # how many example will studied before model updates its brain
+epochs: int = 1  # How many times the model will read through the ENTIRE dataset.
 val_split: float = 0.1
 
-model_out: Path = Path("lstm_model.h5")             #path for saving model's brain
-tokenizer_out: Path = Path("tokenizer.pickle")      #path for saving dictionary(words and their numbers)
+model_out: Path = Path("lstm_model.h5")  # path for saving model's brain
+tokenizer_out: Path = Path(
+    "tokenizer.pickle"
+)  # path for saving dictionary(words and their numbers)
 
 # training / tokenization knobs
-oov_token: str = "<OOV>"        # "Out Of Vocabulary". The placeholder used if the tokenizer sees a brand new word it didn't learn.
-tf_filters: str = r'!"#$%&()*+,-./:;<=>?@[\]^_`{|}~'        # Punctuation marks to delete so "Hello!" and "Hello" are treated as the same word.
-threshold: float = 0.5      #for easy choose 1 and 0. like 0.51 and 0.49.
+oov_token: str = (
+    "<OOV>"  # "Out Of Vocabulary". The placeholder used if the tokenizer sees a brand new word it didn't learn.
+)
+tf_filters: str = (
+    r'!"#$%&()*+,-./:;<=>?@[\]^_`{|}~'  # Punctuation marks to delete so "Hello!" and "Hello" are treated as the same word.
+)
+threshold: float = 0.5  # for easy choose 1 and 0. like 0.51 and 0.49.
 
- 
+
 def normalize_binary_labels(y: pd.Series) -> np.ndarray:
     """
     Accepts common binary label formats:
@@ -87,7 +105,9 @@ def normalize_binary_labels(y: pd.Series) -> np.ndarray:
     return y_str.map(mapping).astype(np.int32).to_numpy()
 
 
-def stratified_split_indices(y: np.ndarray, test_size: float, seed: int) -> Tuple[np.ndarray, np.ndarray]:
+def stratified_split_indices(
+    y: np.ndarray, test_size: float, seed: int
+) -> Tuple[np.ndarray, np.ndarray]:
     """Returns train_idx, test_idx with stratification for binary labels."""
     rng = np.random.default_rng(seed)
     classes = np.unique(y)
@@ -110,9 +130,6 @@ def stratified_split_indices(y: np.ndarray, test_size: float, seed: int) -> Tupl
     return train_idx, test_idx
 
 
-
-
-
 def stratified_kfold_indices(y: np.ndarray, k: int, seed: int):
     """
     Returns list of (train_idx, test_idx) tuples for stratified K-fold.
@@ -129,7 +146,7 @@ def stratified_kfold_indices(y: np.ndarray, k: int, seed: int):
 
     for c in classes:
         idx = np.where(y == c)[0]  # o class'a ait indexler
-        rng.shuffle(idx)           # karıştır
+        rng.shuffle(idx)  # karıştır
         folds = np.array_split(idx, k)  # k parçaya böl
         per_class_folds[c] = folds
 
@@ -159,15 +176,6 @@ def stratified_kfold_indices(y: np.ndarray, k: int, seed: int):
         splits.append((train_idx, test_idx))
 
     return splits
-
-
-
-
-
-
-
-
-
 
 
 def binary_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
@@ -205,14 +213,15 @@ def exact_text_overlap_count(train_text: np.ndarray, test_text: np.ndarray) -> i
 # Data
 # -----------------------------
 def load_dataset() -> pd.DataFrame:
-    if not data_path.exists():
-        raise FileNotFoundError(f"Dataset not found: {data_path.resolve()}")
-    return pd.read_csv(data_path)
+    df = load_cleaned_csvs(Path("data_center/data/cleaned"))
+    return df
 
 
 def infer_columns(df: pd.DataFrame) -> tuple[str, str]:
     if df.shape[1] < 2:
-        raise ValueError(f"Expected at least 2 columns (text,label). Got: {df.columns.tolist()}")
+        raise ValueError(
+            f"Expected at least 2 columns (text,label). Got: {df.columns.tolist()}"
+        )
     return df.columns[0], df.columns[1]
 
 
@@ -222,7 +231,9 @@ def clean_dataset(df: pd.DataFrame, text_col: str, label_col: str) -> pd.DataFra
     return df
 
 
-def build_xy(df: pd.DataFrame, text_col: str, label_col: str) -> tuple[np.ndarray, np.ndarray]:
+def build_xy(
+    df: pd.DataFrame, text_col: str, label_col: str
+) -> tuple[np.ndarray, np.ndarray]:
     x_text = df[text_col].astype(str).to_numpy()
     y = normalize_binary_labels(df[label_col])
     return x_text, y
@@ -237,7 +248,7 @@ def train_test_split_stratified(
     train_idx, test_idx = stratified_split_indices(y, test_size=test_size, seed=seed)
     return x_text[train_idx], x_text[test_idx], y[train_idx], y[test_idx]
 
- 
+
 def build_tokenizer() -> Tokenizer:
     return Tokenizer(
         num_words=max_nb_words,
@@ -267,12 +278,16 @@ def fit_and_transform_text(
 # Model Build
 def build_model(model_name: str = "lstm") -> tf.keras.Model:
     if model_name == "lstm":
-        model = Sequential([
-            Embedding(max_nb_words, embedding_dim, input_length=max_sequence_length),
-            SpatialDropout1D(0.2),
-            LSTM(100, dropout=0.2, recurrent_dropout=0.2),
-            Dense(1, activation="sigmoid"),
-        ])
+        model = Sequential(
+            [
+                Embedding(
+                    max_nb_words, embedding_dim, input_length=max_sequence_length
+                ),
+                SpatialDropout1D(0.2),
+                LSTM(100, dropout=0.2, recurrent_dropout=0.2),
+                Dense(1, activation="sigmoid"),
+            ]
+        )
 
     else:
         raise ValueError(f"Unknown model_name: {model_name}")
@@ -299,12 +314,12 @@ def train_model(
     )
 
 
-def predict_labels(model: tf.keras.Model, x_test_pad: np.ndarray, threshold: float) -> tuple[np.ndarray, np.ndarray]:
+def predict_labels(
+    model: tf.keras.Model, x_test_pad: np.ndarray, threshold: float
+) -> tuple[np.ndarray, np.ndarray]:
     y_pred_probs = model.predict(x_test_pad, verbose=0).reshape(-1)
     y_pred = (y_pred_probs >= threshold).astype(np.int32)
     return y_pred_probs, y_pred
-
-
 
 
 def run_one_fold(
@@ -350,10 +365,9 @@ def run_one_fold(
     return m
 
 
-
 def run_cv(model_name: str, k: int = 5) -> None:
     t0 = time.perf_counter()
-    print(f"\n########## CV START: {model_name} | k={k} ##########")
+    print(f"\n########## Script START: {model_name} | k={k} ##########")
 
     df = load_dataset()
     text_col, label_col = infer_columns(df)
@@ -369,7 +383,10 @@ def run_cv(model_name: str, k: int = 5) -> None:
     metrics_list = []
     for fold_i, (train_idx, test_idx) in enumerate(splits, start=1):
         print(f"\n=== {model_name} | Fold {fold_i}/{k} ===")
-        print("Leakage (exact text overlap):", exact_text_overlap_count(x_text[train_idx], x_text[test_idx]))
+        print(
+            "Leakage (exact text overlap):",
+            exact_text_overlap_count(x_text[train_idx], x_text[test_idx]),
+        )
 
         m = run_one_fold(model_name, x_text, y, train_idx, test_idx)
         print_metrics(m)
@@ -398,7 +415,7 @@ def save_tokenizer(tokenizer: Tokenizer, out_path: Path) -> None:
     with open(out_path, "wb") as f:
         pickle.dump(tokenizer, f, protocol=pickle.HIGHEST_PROTOCOL)
 
- 
+
 def print_metrics(m: Dict[str, float]) -> None:
     print("-" * 60)
     print(f"Accuracy : {m['accuracy']}")
@@ -409,7 +426,8 @@ def print_metrics(m: Dict[str, float]) -> None:
     print(f"{int(m['tn']):6d} {int(m['fp']):6d}")
     print(f"{int(m['fn']):6d} {int(m['tp']):6d}")
     print("-" * 60)
- 
+
+
 def run(model_name: str = "lstm") -> None:
     t0 = time.perf_counter()
 
@@ -430,7 +448,10 @@ def run(model_name: str = "lstm") -> None:
         test_size=test_size,
         seed=random_seed,
     )
-    print("Common text between test and train:", exact_text_overlap_count(x_train_text, x_test_text))
+    print(
+        "Common text between test and train:",
+        exact_text_overlap_count(x_train_text, x_test_text),
+    )
 
     print(">>> Tokenization...")
     tokenizer = build_tokenizer()
@@ -444,7 +465,7 @@ def run(model_name: str = "lstm") -> None:
     print(f"Test  shape: {x_test_pad.shape}")
 
     print(f">>> Creating model: {model_name} ...")
-    model = build_model(model_name)   # ✅ artık model_name var
+    model = build_model(model_name)  # ✅ artık model_name var
     model.summary()
 
     print(">>> Training...")
@@ -478,12 +499,11 @@ def run(model_name: str = "lstm") -> None:
     print(f"Total time: {elapsed:.2f}s")
 
 
-    
-
 def main() -> None:
     tf.get_logger().setLevel("ERROR")
 
     run_cv("lstm")
+
 
 if __name__ == "__main__":
     main()
