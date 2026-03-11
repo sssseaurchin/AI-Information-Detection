@@ -1,6 +1,7 @@
 ### Project Specific ###
 dataset
 src/cnn/model
+test.py
 
 *.jpeg
 *.png
