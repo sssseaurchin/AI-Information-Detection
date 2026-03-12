@@ -5,12 +5,13 @@ import logging
 logging.basicConfig(level=logging.INFO)
 from datasets import load_dataset, Dataset, DatasetDict
 import json
+import pandas as pd
 
 
 # HUMAN = 0; AI = 1;    
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = BASE_DIR / "data" / "raw_datas"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 KAGGLE_FILE = "kaggle.json"
 HUGGING_FACE_FILE = "hugging_face.json"
@@ -77,6 +78,53 @@ def _kaggle_download(handle: str, filename: str) -> Path:
     )
     return out_file
 
+
+
+
+### COLLECT TEXT FILES (for datasets stored as individual .txt files)
+
+def _collect_text_files(source_dir: Path, out_csv: Path) -> Path:
+
+    """Klasör yapısından (ai/, human/) text dosyalarını toplayıp tek CSV yapar."""
+
+    if out_csv.exists() and out_csv.stat().st_size > 0:
+
+        logging.info(f"[Collect] Already exists, skipping: {out_csv}")
+
+        return out_csv
+    rows = []
+    for txt_file in source_dir.rglob("*.txt"):
+
+        text = txt_file.read_text(encoding="utf-8", errors="ignore").strip()
+
+        if not text:
+
+            continue
+        parts = [p.lower() for p in txt_file.parts]
+        if "human" in parts:
+
+            label = 0
+        elif "ai" in parts:
+
+            label = 1
+        else:
+            continue
+        rows.append({"text": text, "isGenerated": label})
+
+    df = pd.DataFrame(rows)
+    out_csv.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_csv, index=False)
+    logging.info(f"[Collect] {len(df)} texts -> {out_csv}")
+    return out_csv
+
+
+
+
+
+
+
+
+
 ### HUGGING FACE
 def _list_all_hugging_face()-> list[dict]:
     json_path =  Path(HUGGING_FACE_FILE)
@@ -89,7 +137,7 @@ def download_all_hugging_face():
     logging.info(f"Downloading from list: {list}")
     
     for dic in list:
-        _hugging_face_download(name=dic["name"])
+        _hugging_face_download(name=dic["name"], subset=dic.get("subset"))
 
 
 def _hugging_face_download(
@@ -169,5 +217,16 @@ def _hugging_face_download(
 if __name__ == "__main__":
     print("Starting Downloader") 
     # _kaggle_download(handle="khushu89/human-vs-ai-text-classification-dataset", filename="human-vs-ai-text-classification-dataset.csv")
+    
+    
     download_all_kaggle()
-    # download_all_hugging_face()
+    download_all_hugging_face()
+
+
+
+    
+    khushu89_cache = Path.home() / ".cache" / "kagglehub" / "datasets" / \
+        "khushu89" / "human-vs-ai-text-classification-dataset" / "versions" / "2" / "my_dataset_expanded"
+
+    if khushu89_cache.exists():
+        _collect_text_files(khushu89_cache, DATA_DIR / "khushu89_collected.csv")
