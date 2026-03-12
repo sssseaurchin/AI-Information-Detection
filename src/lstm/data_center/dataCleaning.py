@@ -15,13 +15,13 @@ def _save_to_disk(df: pd.DataFrame, filename: str):
     """
     Removes duplicates, drops null values, ensures folder exists,
     and saves the cleaned dataset.
-    """ 
+    """
     CLEANED_DATA_FOLDER.mkdir(parents=True, exist_ok=True)
- 
+
     df = df.drop_duplicates(subset=["text", "isGenerated"])
     df = df.dropna(subset=["text", "isGenerated"])
- 
-    path_to_save = CLEANED_DATA_FOLDER / f"cleaned_{filename}" 
+
+    path_to_save = CLEANED_DATA_FOLDER / f"cleaned_{filename}"
     df.to_csv(path_to_save, index=False)
     logging.info(f"Saved cleaned dataset to {path_to_save}({len(df)} rows)")
     return path_to_save
@@ -30,7 +30,6 @@ def _save_to_disk(df: pd.DataFrame, filename: str):
 def AI_Human():
     path = "data/AI_Human.csv"
     df = pd.read_csv(path)
-    # df["generated"] = 1 - df["generated"]
     df = df.rename(columns={"Text": "text", "generated": "isGenerated"})
     # df.to_csv("data/AI_Human_cleaned.csv", index=False)
     _save_to_disk(df, "AI_Human_cleaned.csv")
