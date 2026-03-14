@@ -1,13 +1,7 @@
 import tensorflow as tf
 from typing import Optional
-from skimage.feature import graycomatrix, graycoprops
-
-def _image_read(path: str) -> tf.Tensor:
-    img_bytes = tf.io.read_file(path)
-    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
-    img = tf.ensure_shape(img, [None, None, 3])
-    img = tf.cast(img, tf.float32)
-    return img
+from skimage.feature import graycomatrix
+from features_tools import image_read, fft_spectrum
 
 def get_covariance_matrix(path: str) -> tuple[tf.Tensor, tf.Tensor]:
     """Returns a [2,2] tf.Tensor of sobel edge covariants for given image.
@@ -19,7 +13,7 @@ def get_covariance_matrix(path: str) -> tuple[tf.Tensor, tf.Tensor]:
         tuple[tf.Tensor, tf.Tensor]: _A [2,2] covariance matrix of the given image_
     """
     
-    img = _image_read(path)
+    img = image_read(path)
     
     luminance = tf.cast(0.2126 * img[:, :, 0] + 0.7152 * img[:, :, 1] + 0.0722 * img[:, :, 2], tf.float32) # [x, y]
     
@@ -50,7 +44,7 @@ def gray_comatrix(path: str, num_levels: int = 8, image_size: Optional[tuple[int
         tf.Tensor: _A [num_levels, num_levels] tensor representing the GLCM of the image._
         """
         
-    img = _image_read(path)
+    img = image_read(path)
     
     if image_size is not None:
         img = tf.image.resize(img, image_size)
@@ -62,3 +56,28 @@ def gray_comatrix(path: str, num_levels: int = 8, image_size: Optional[tuple[int
     glcm_np = graycomatrix(gray.numpy().squeeze(), distances=[1], angles=[0], levels=num_levels, symmetric=True, normed=False)
     
     return tf.convert_to_tensor(glcm_np[:, :, 0, 0], dtype=tf.int32)
+
+def frequency_log_spectrum(path: str) -> tf.Tensor:
+    return fft_spectrum(path)
+
+def frequency_mean(path: str) -> tf.Tensor:
+    spec = fft_spectrum(path)
+    mean = tf.reduce_mean(spec)
+    return mean
+
+def frequency_variance(path: str) -> tf.Tensor:
+    spec = fft_spectrum(path)
+    variance = tf.math.reduce_variance(spec)
+    return variance
+
+def frequency_skewness(path: str) -> tf.Tensor:
+    spec = fft_spectrum(path)
+    mean = frequency_mean(path)
+    variance = frequency_variance(path)
+    skewness = tf.reduce_mean(((spec - mean) ** 3) / (variance ** 1.5 + 1e-8))
+    return skewness
+
+def frequency_high(path: str) -> tf.Tensor:
+    spec = fft_spectrum(path)
+    high_freq = tf.reduce_mean(spec[spec > tf.reduce_mean(spec)])
+    return high_freq
