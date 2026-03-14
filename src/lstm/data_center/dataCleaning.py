@@ -5,9 +5,9 @@ from pathlib import Path
 # All cleaning functions normalize to: text, isGenerated (0=Human, 1=AI)
 
 BASE_DIR = Path(__file__).resolve().parent
-KAGGLE_FOLDER = BASE_DIR / "data" / "raw_datas" / "kaggle"
-HF_FOLDER = BASE_DIR / "data" / "raw_datas" / "huggingface"
-CLEANED_FOLDER = BASE_DIR / "data" / "cleaned_datas"
+KAGGLE_FOLDER = BASE_DIR / "data" / "raw_data" / "kaggle"
+HF_FOLDER = BASE_DIR / "data" / "raw_data" / "huggingface"
+CLEANED_FOLDER = BASE_DIR / "data" / "cleaned_data"
 CLEANED_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
@@ -82,14 +82,14 @@ def clean_ai_vs_human_comparison():
 
 def clean_aknjit():
     # Columns: text, label (0/1)
-    df = pd.read_csv(KAGGLE_FOLDER / "aknjit" / "human-vs-ai-text-classification-dataset.csv")
+    df = pd.read_csv(KAGGLE_FOLDER / "aknjit_human-vs-ai-text-classification-dataset.csv")
     df = df.rename(columns={"label": "isGenerated"})
     _save_to_disk(df, "cleaned_aknjit.csv")
 
 
 def clean_algozee():
     # Columns: content_text, author_type (human/ai)
-    df = pd.read_csv(KAGGLE_FOLDER / "algozee" / "ai-generated-vs-human-written-text-dataset.csv")
+    df = pd.read_csv(KAGGLE_FOLDER / "algozee_ai-generated-vs-human-written-text-dataset.csv")
     df = df.rename(columns={"content_text": "text"})
     labels = df["author_type"].astype(str).str.strip().str.lower()
     df["isGenerated"] = labels.map({"human": 0, "ai": 1})

@@ -2,32 +2,38 @@ from pathlib import Path
 import shutil
 import kagglehub
 import logging
+
 logging.basicConfig(level=logging.INFO)
 from datasets import load_dataset, Dataset, DatasetDict
 import json
 import pandas as pd
 
 
-# HUMAN = 0; AI = 1;    
+# HUMAN = 0; AI = 1;
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data" / "raw_datas"
+DATA_DIR = BASE_DIR / "data" / "raw_data"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
 KAGGLE_FILE = "kaggle.json"
 HUGGING_FACE_FILE = "hugging_face.json"
 
 
 ### KAGGLE
 def _list_all_kaggle() -> list[dict]:
-    json_path =  Path(KAGGLE_FILE)
+    json_path = Path(KAGGLE_FILE)
     with json_path.open("r", encoding="utf-8") as file:
         return json.load(file)
 
+
 def download_all_kaggle():
     list = _list_all_kaggle()
-    
+
     for dic in list:
         _kaggle_download(handle=dic["handle"], filename=dic["file_name"])
+
+
 def _kaggle_download(handle: str, filename: str) -> Path:
     out_file = DATA_DIR / filename
 
@@ -48,10 +54,7 @@ def _kaggle_download(handle: str, filename: str) -> Path:
         return out_file
 
     # 2) Auto-discover candidates
-    candidates = [
-        p for p in dataset_dir.rglob("*")
-        if p.is_file() and p.suffix.lower() in {".csv", ".tsv", ".json", ".jsonl", ".parquet"}
-    ]
+    candidates = [p for p in dataset_dir.rglob("*") if p.is_file() and p.suffix.lower() in {".csv", ".tsv", ".json", ".jsonl", ".parquet"}]
 
     if not candidates:
         logging.warning(f"[Kaggle] No data files found in {dataset_dir}. Creating empty file: {out_file}")
@@ -72,19 +75,14 @@ def _kaggle_download(handle: str, filename: str) -> Path:
     src = candidates[0]
 
     shutil.copy2(src, out_file)
-    logging.warning(
-        f"[Kaggle] Exact file not found ({Path(filename).name}). "
-        f"Copied best match '{src.relative_to(dataset_dir)}' -> '{out_file}'."
-    )
+    logging.warning(f"[Kaggle] Exact file not found ({Path(filename).name}). " f"Copied best match '{src.relative_to(dataset_dir)}' -> '{out_file}'.")
     return out_file
-
-
 
 
 ### COLLECT TEXT FILES (for datasets stored as individual .txt files)
 
-def _collect_text_files(source_dir: Path, out_csv: Path) -> Path:
 
+def _collect_text_files(source_dir: Path, out_csv: Path) -> Path:
     """Klasör yapısından (ai/, human/) text dosyalarını toplayıp tek CSV yapar."""
 
     if out_csv.exists() and out_csv.stat().st_size > 0:
@@ -118,16 +116,9 @@ def _collect_text_files(source_dir: Path, out_csv: Path) -> Path:
     return out_csv
 
 
-
-
-
-
-
-
-
 ### HUGGING FACE
-def _list_all_hugging_face()-> list[dict]:
-    json_path =  Path(HUGGING_FACE_FILE)
+def _list_all_hugging_face() -> list[dict]:
+    json_path = Path(HUGGING_FACE_FILE)
     with json_path.open("r", encoding="utf-8") as file:
         return json.load(file)
 
@@ -135,7 +126,7 @@ def _list_all_hugging_face()-> list[dict]:
 def download_all_hugging_face():
     list = _list_all_hugging_face()
     logging.info(f"Downloading from list: {list}")
-    
+
     for dic in list:
         _hugging_face_download(name=dic["name"], subset=dic.get("subset"))
 
@@ -160,8 +151,7 @@ def _hugging_face_download(
     out_dir.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        dataset = load_dataset(name, name=subset, cache_dir=str(hf_cache)) if subset else \
-             load_dataset(name, cache_dir=str(hf_cache))
+        dataset = load_dataset(name, name=subset, cache_dir=str(hf_cache)) if subset else load_dataset(name, cache_dir=str(hf_cache))
 
     except RuntimeError as e:
         # datasets>=4.0.0 blocks script-based datasets; fall back to parquet conversion branch
@@ -171,21 +161,19 @@ def _hugging_face_download(
         logging.warning(f"[HF] Script-based dataset blocked; falling back to refs/convert/parquet: {name}")
 
         # HC3 and similar datasets store configs as folders under refs/convert/parquet (e.g., all/, finance/, ...)
-        data_files = (
-            f"hf://datasets/{name}@refs/convert/parquet/{subset}/**/*.parquet"
-            if subset else
-            f"hf://datasets/{name}@refs/convert/parquet/**/*.parquet"
-        )
+        data_files = f"hf://datasets/{name}@refs/convert/parquet/{subset}/**/*.parquet" if subset else f"hf://datasets/{name}@refs/convert/parquet/**/*.parquet"
 
         dataset = load_dataset(
             "parquet",
             data_files=data_files,
             cache_dir=str(hf_cache),
         )
-    def __jsonify_complex_columns(ds: Dataset) -> Dataset: # yeah a function inside of a function
+
+    def __jsonify_complex_columns(ds: Dataset) -> Dataset:  # yeah a function inside of a function
         """
         CSV can't store list/dict columns well. Convert list/dict values to JSON strings.
         """
+
         def convert_row(row):
             for k, v in row.items():
                 if isinstance(v, (list, dict)):
@@ -194,8 +182,8 @@ def _hugging_face_download(
 
         # map is lazy-ish; this will materialize when writing
         return ds.map(convert_row)
-    
-     # Export to CSV
+
+    # Export to CSV
     if isinstance(dataset, DatasetDict):
         for split, split_ds in dataset.items():
             split_ds = __jsonify_complex_columns(split_ds)
@@ -214,19 +202,15 @@ def _hugging_face_download(
     logging.info(f"[HF] Saved CSVs to: {out_dir}")
     return out_dir
 
+
 if __name__ == "__main__":
-    print("Starting Downloader") 
+    print("Starting Downloader")
     # _kaggle_download(handle="khushu89/human-vs-ai-text-classification-dataset", filename="human-vs-ai-text-classification-dataset.csv")
-    
-    
+
     download_all_kaggle()
     download_all_hugging_face()
 
-
-
-    
-    khushu89_cache = Path.home() / ".cache" / "kagglehub" / "datasets" / \
-        "khushu89" / "human-vs-ai-text-classification-dataset" / "versions" / "2" / "my_dataset_expanded"
+    khushu89_cache = Path.home() / ".cache" / "kagglehub" / "datasets" / "khushu89" / "human-vs-ai-text-classification-dataset" / "versions" / "2" / "my_dataset_expanded"
 
     if khushu89_cache.exists():
         _collect_text_files(khushu89_cache, DATA_DIR / "khushu89_collected.csv")
