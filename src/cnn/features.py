@@ -3,6 +3,8 @@ from typing import Optional
 from skimage.feature import graycomatrix
 from features_tools import image_read, fft_spectrum
 
+# ----------------------------SPATIAL FEATURES----------------------------
+
 def get_covariance_matrix(path: str) -> tuple[tf.Tensor, tf.Tensor]:
     """Returns a [2,2] tf.Tensor of sobel edge covariants for given image.
 
@@ -32,6 +34,24 @@ def get_covariance_matrix(path: str) -> tuple[tf.Tensor, tf.Tensor]:
     
     return C
 
+def noise_residual(path: str) -> tf.Tensor:
+    image = image_read(path)
+    
+    # High pass filter kernel for noise residual extraction subject to change
+    kernel = tf.constant([
+        [-1, 2, -2, 2, -1],
+        [2, -6, 8, -6, 2],
+        [-2, 8, -12, 8, -2],
+        [2, -6, 8, -6, 2],
+        [-1, 2, -2, 2, -1]
+    ], dtype=tf.float32)
+
+    kernel = kernel[:, :, None, None]
+    image = tf.expand_dims(image, 0)
+    residual = tf.nn.conv2d(image, kernel, strides=1, padding="SAME")
+
+    return residual
+
 # See paper "Detecting GAN generated Fake Images using Co-occurrence Matrices"[https://library.imaging.org/ei/articles/31/5/art00008]
 def gray_comatrix(path: str, num_levels: int = 8, image_size: Optional[tuple[int, int]] = None) -> tf.Tensor:
     """Returns a gray level co-occurrence matrix for the given image using scikit-image.
@@ -57,6 +77,8 @@ def gray_comatrix(path: str, num_levels: int = 8, image_size: Optional[tuple[int
     
     return tf.convert_to_tensor(glcm_np[:, :, 0, 0], dtype=tf.int32)
 
+# ----------------------------FREQUENCY FEATURES----------------------------
+
 def frequency_log_spectrum(path: str) -> tf.Tensor:
     return fft_spectrum(path)
 
@@ -81,3 +103,28 @@ def frequency_high(path: str) -> tf.Tensor:
     spec = fft_spectrum(path)
     high_freq = tf.reduce_mean(spec[spec > tf.reduce_mean(spec)])
     return high_freq
+
+def radial_spectrum(path: str) -> tf.Tensor:
+    # Computes the radial spectrum by averaging the FFT spectrum values in concentric circles around the center of the spectrum.
+    spec = fft_spectrum(path)
+    
+    h, w = spec.shape
+    cy, cx = h//2, w//2
+
+    y = tf.range(h)
+    x = tf.range(w)
+
+    Y, X = tf.meshgrid(y, x, indexing="ij")
+
+    r = tf.sqrt((X-cx)**2 + (Y-cy)**2)
+    r = tf.cast(r, tf.int32)
+    max_r = tf.reduce_max(r)
+
+    spectrum = []
+
+    for i in range(max_r):
+        mask = tf.where(r == i)
+        values = tf.gather_nd(spec, mask)
+        spectrum.append(tf.reduce_mean(values))
+
+    return tf.stack(spectrum)
