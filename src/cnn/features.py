@@ -34,24 +34,6 @@ def get_covariance_matrix(path: str) -> tuple[tf.Tensor, tf.Tensor]:
     
     return C
 
-def noise_residual(path: str) -> tf.Tensor:
-    image = image_read(path)
-    
-    # High pass filter kernel for noise residual extraction subject to change
-    kernel = tf.constant([
-        [-1, 2, -2, 2, -1],
-        [2, -6, 8, -6, 2],
-        [-2, 8, -12, 8, -2],
-        [2, -6, 8, -6, 2],
-        [-1, 2, -2, 2, -1]
-    ], dtype=tf.float32)
-
-    kernel = kernel[:, :, None, None]
-    image = tf.expand_dims(image, 0)
-    residual = tf.nn.conv2d(image, kernel, strides=1, padding="SAME")
-
-    return residual
-
 # See paper "Detecting GAN generated Fake Images using Co-occurrence Matrices"[https://library.imaging.org/ei/articles/31/5/art00008]
 def gray_comatrix(path: str, num_levels: int = 8, image_size: Optional[tuple[int, int]] = None) -> tf.Tensor:
     """Returns a gray level co-occurrence matrix for the given image using scikit-image.
@@ -76,6 +58,24 @@ def gray_comatrix(path: str, num_levels: int = 8, image_size: Optional[tuple[int
     glcm_np = graycomatrix(gray.numpy().squeeze(), distances=[1], angles=[0], levels=num_levels, symmetric=True, normed=False)
     
     return tf.convert_to_tensor(glcm_np[:, :, 0, 0], dtype=tf.int32)
+
+def noise_residual(path: str) -> tf.Tensor:
+    image = image_read(path)
+    
+    # High pass filter kernel for noise residual extraction subject to change
+    kernel = tf.constant([
+        [-1, 2, -2, 2, -1],
+        [2, -6, 8, -6, 2],
+        [-2, 8, -12, 8, -2],
+        [2, -6, 8, -6, 2],
+        [-1, 2, -2, 2, -1]
+    ], dtype=tf.float32)
+
+    kernel = kernel[:, :, None, None]
+    image = tf.expand_dims(image, 0)
+    residual = tf.nn.conv2d(image, kernel, strides=1, padding="SAME")
+
+    return residual
 
 # ----------------------------FREQUENCY FEATURES----------------------------
 
