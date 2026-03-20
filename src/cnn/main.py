@@ -106,6 +106,22 @@ def _hash_label_mapping(label_mapping: dict[str, int]) -> str:
     payload = json.dumps(label_mapping, sort_keys=True).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
+
+def get_default_dataset_path() -> str:
+    """Resolve the repository-local prepared training dataset path."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    return os.path.join(project_root, "Dataset", "prepared", "combined_train")
+
+
+def resolve_default_split_manifest_path(dataset_path: str, split_manifest_path: str) -> str:
+    """Keep split manifests dataset-local when the caller did not override the default path."""
+    default_repo_manifest = os.path.abspath(get_default_manifest_path())
+    requested_manifest = os.path.abspath(split_manifest_path)
+    if requested_manifest == default_repo_manifest:
+        return os.path.join(dataset_path, "split_manifest.csv")
+    return split_manifest_path
+
 def main():
     args = parse_args()
     # Path to dataset CSV
@@ -115,15 +131,10 @@ def main():
     dataset_path = os.environ.get('DATASET_PATH')
     
     if not dataset_path:
-        # Get absolute path to Dataset folder in project root
-        # main.py is in src/cnn/, so we go up 2 levels to project root
-        # current_file_dir = os.path.dirname(os.path.abspath(__file__))
-        # project_root = os.path.dirname(os.path.dirname(current_file_dir))
-        # dataset_path = os.path.join(project_root, 'Dataset', 'train')
-        dataset_path = r"E:\omg bruhhhhhh\DatasetFixed\small_set"
-        
-        # Use absolute path
-        dataset_path = os.path.abspath(dataset_path)
+        dataset_path = get_default_dataset_path()
+
+    dataset_path = os.path.abspath(dataset_path)
+    args.split_manifest = resolve_default_split_manifest_path(dataset_path, args.split_manifest)
     
     print(f"Dataset path: {dataset_path}")
     print(f"Split manifest path: {args.split_manifest}")

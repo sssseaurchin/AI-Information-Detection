@@ -10,7 +10,7 @@ services:
     command: python3 -m main
     environment:
       PYTHONPATH: /app/src/cnn
-      DATASET_PATH: /app/Dataset
+      DATASET_PATH: /app/Dataset/prepared/combined_train
     volumes:
       - .:/app
     ports:
@@ -27,7 +27,7 @@ services:
     command: python3 -m main
     environment:
       PYTHONPATH: /app/src/cnn
-      DATASET_PATH: /app/Dataset
+      DATASET_PATH: /app/Dataset/prepared/combined_train
     volumes:
       - .:/app
     ports:
