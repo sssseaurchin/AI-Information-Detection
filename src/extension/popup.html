@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AID – AI Information Detection</title>
+    <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<main class="container">
+    <div class="card">
+        <div class="header-row">
+            <span class="logo-big">AID</span>
+            <span class="logo-text">v1.0.0</span>
+        </div>
+
+        <textarea
+                class="input"
+                placeholder="Paste the text here..."
+                rows="3"
+        ></textarea>
+
+        <div class="dropzone">
+            <p>Drop the image here</p>
+            <button class="upload-btn">Upload</button>
+            <button class="remove-btn" aria-label="Remove image">✕</button>
+        </div>
+
+        <button class="submit-btn">
+            Analyze
+        </button>
+    </div>
+
+    <div id="overlay" class="overlay" aria-hidden="true">
+        <div class="overlay-card" role="dialog">
+            <button class="overlay-close">✕</button>
+
+            <div class="radial" style="--value:0">
+                <span class="radial-text">0%</span>
+            </div>
+
+            <h3 id="resultLabel"></h3>
+            <p id="resultDetails"></p>
+        </div>
+    </div>
+</main>
+<script src="script.js" defer></script>
+</body>
+</html>
