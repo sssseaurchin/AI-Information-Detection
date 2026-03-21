@@ -127,7 +127,7 @@ def save_progress(done_indices: set):
 
 def generate(test_mode: bool = False):
     # API key kontrolü
-    api_key = "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"
+    api_key = "YOUR_API_KEY_HERE"
     if not api_key:
         print("HATA: ANTHROPIC_API_KEY ortam değişkeni set edilmemiş!")
         print("Windows: set ANTHROPIC_API_KEY=sk-ant-...")
