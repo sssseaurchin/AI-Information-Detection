@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-CLEANED_FOLDER = BASE_DIR / "data" / "cleaned_datas"
+CLEANED_FOLDER = BASE_DIR / "external_datasets" / "cleaned_datas"
 
 
 def analyze_single(path: Path) -> dict:

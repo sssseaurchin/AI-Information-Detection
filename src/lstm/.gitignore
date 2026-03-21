@@ -8,3 +8,7 @@
 
 */data
 *.h5
+
+hf_cache/
+__pycache__/
+*.lock
