@@ -5,7 +5,7 @@ os.environ["TF_USE_LEGACY_KERAS"] = "1"
 # ---------------------------------------------------
 
 # ŞİMDİ diğerlerini çağırabiliriz
-from cnn import cnnModel
+import cnnModel
 import tensorflow as tf
 
 """def cnn_analyze_image(image_name:str):
@@ -18,7 +18,7 @@ import tensorflow as tf
 
     print(f"Prediction for image {image_name}: {prediction}")"""
 
-MODEL_NAME = "model.h5"
+MODEL_NAME = "ai_detection_model.h5"
 
 def cnn_analyze_image(image_name):
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -26,7 +26,7 @@ def cnn_analyze_image(image_name):
     
     MODEL_PATH = os.path.join(current_dir, "model", MODEL_NAME) 
     
-    final_image_path = os.path.join(current_dir, image_name)
+    final_image_path = os.path.join(current_dir, "model", image_name)
 
     print(f"DEBUG: Model Yolu: {MODEL_PATH}")
     print(f"DEBUG: Resim Yolu: {final_image_path}")
@@ -34,7 +34,7 @@ def cnn_analyze_image(image_name):
     try:
         model = tf.keras.models.load_model(MODEL_PATH, compile=False)
         print("MODEL YUKLENDI")
-        prediction = cnnModel.predict_image(model, final_image_path)
+        prediction = cnnModel.predict_image(model, final_image_path, preprocessing_func=cnnModel.preprocess_sobel_edge)
         
         print(f"Prediction result: {prediction}")
         
@@ -46,6 +46,6 @@ def cnn_analyze_image(image_name):
     
 
 if __name__ == "__main__": 
-    cnn_analyze_image(r"aaa.jpg")
+    cnn_analyze_image(r"ai_woman.jpg")
     # prayers
             

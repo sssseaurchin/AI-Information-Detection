@@ -387,3 +387,14 @@ pyrightconfig.json
 # Ignore all local history of files
 .history
 .ionide
+
+# Docker-only local runtime artifacts
+reports/
+governance/
+src/cnn/splits/
+src/cnn/ai/
+src/cnn/DRCT-main/
+
+# Local virtual environments
+venv/
+src/venv/
