@@ -30,6 +30,7 @@ def analyze_image():
     b64 = payload.get("image_base64") or payload.get("base64") or payload.get("b64")
 
     ext = payload.get("ext", "jpg")  # !!!!
+    ext = payload.get("ext", "jpg")  # !!!!
 
     try:
         image_path = save_image_from_base64(base64_str=b64, ext=ext)
@@ -39,6 +40,7 @@ def analyze_image():
 
     confidence = cnn_analyze_image(image_path)
 
+    return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
     return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
 
 
@@ -53,10 +55,13 @@ def analyze_text():
 
     try:
         confidence = lstm_analyze_text(text=text)  # lstm.services'ten alınan func
+        confidence = lstm_analyze_text(text=text)  # lstm.services'ten alınan func
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
 
     print(f"Text analyzed with confidence: {confidence}")
+    return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
+
     return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
 
 

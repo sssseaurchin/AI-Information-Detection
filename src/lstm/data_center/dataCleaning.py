@@ -6,9 +6,9 @@ from pathlib import Path
 # All cleaning functions normalize to: text, isGenerated (0=Human, 1=AI)
 
 BASE_DIR = Path(__file__).resolve().parent
-KAGGLE_FOLDER = BASE_DIR / "external_datasets" / "raw_datas" / "kaggle"
-HF_FOLDER = BASE_DIR / "external_datasets" / "raw_datas" / "huggingface"
-CLEANED_FOLDER = BASE_DIR / "external_datasets" / "cleaned_datas"
+KAGGLE_FOLDER = BASE_DIR / "data" / "raw_data" / "kaggle"
+HF_FOLDER = BASE_DIR / "data" / "raw_data" / "huggingface"
+CLEANED_FOLDER = BASE_DIR / "data" / "cleaned_data"
 CLEANED_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
@@ -83,14 +83,14 @@ def clean_ai_vs_human_comparison():
 
 def clean_aknjit():
     # Columns: text, label (0/1)
-    df = pd.read_csv(KAGGLE_FOLDER / "aknjit" / "human-vs-ai-text-classification-dataset.csv")
+    df = pd.read_csv(KAGGLE_FOLDER / "aknjit_human-vs-ai-text-classification-dataset.csv")
     df = df.rename(columns={"label": "isGenerated"})
     _save_to_disk(df, "cleaned_aknjit.csv")
 
 
 def clean_algozee():
     # Columns: content_text, author_type (human/ai)
-    df = pd.read_csv(KAGGLE_FOLDER / "algozee" / "ai-generated-vs-human-written-text-dataset.csv")
+    df = pd.read_csv(KAGGLE_FOLDER / "algozee_ai-generated-vs-human-written-text-dataset.csv")
     df = df.rename(columns={"content_text": "text"})
     labels = df["author_type"].astype(str).str.strip().str.lower()
     df["isGenerated"] = labels.map({"human": 0, "ai": 1})
@@ -186,20 +186,12 @@ _MD_ITALIC = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
 _MD_LIST_ITEM = re.compile(r"(?m)^[-*] ")
 
 # Opening/closing meta sentences produced by the LLM
-_META_OPENING = re.compile(
-    r"(?i)^(?:here(?:'?s| is)(?: the| a| my)?(?: rewritten| revised| paraphrased| expanded| following| essay| text| passage| version)?[:\s]*\n?)"
-)
-_META_CLOSING = re.compile(
-    r"(?i)(?:i hope (?:this|you)[^.]*\.|feel free to[^.]*\.|let me know if[^.]*\.|please note[^.]*\.)\s*$"
-)
-_META_PREAMBLE = re.compile(
-    r"(?i)^(?:this (?:is a |is an )?(?:rewritten|revised|paraphrased|essay|text|passage)[^.]*\.\s*)"
-)
+_META_OPENING = re.compile(r"(?i)^(?:here(?:'?s| is)(?: the| a| my)?(?: rewritten| revised| paraphrased| expanded| following| essay| text| passage| version)?[:\s]*\n?)")
+_META_CLOSING = re.compile(r"(?i)(?:i hope (?:this|you)[^.]*\.|feel free to[^.]*\.|let me know if[^.]*\.|please note[^.]*\.)\s*$")
+_META_PREAMBLE = re.compile(r"(?i)^(?:this (?:is a |is an )?(?:rewritten|revised|paraphrased|essay|text|passage)[^.]*\.\s*)")
 
 # Filler openings at the very start of the text
-_FILLER_OPENING = re.compile(
-    r"(?i)^(?:so[,\s]+(?:basically[,\s]+|here'?s?\s+the\s+thing[,\s]*|anyway[,\s]+|yeah[,\s]+)?)"
-)
+_FILLER_OPENING = re.compile(r"(?i)^(?:so[,\s]+(?:basically[,\s]+|here'?s?\s+the\s+thing[,\s]*|anyway[,\s]+|yeah[,\s]+)?)")
 
 
 def _remove_markdown(text: str) -> tuple[str, bool]:
@@ -319,9 +311,7 @@ def clean_ai_data():
     print(f"  Filler acilis temizlenen: {filler_cleaned_count}")
     print(f"  Filtrelenen (kisa)  : {filtered_short}  (<50 kelime)")
     print(f"  Temizleme sonrasi kelime sayisi:")
-    print(f"    min={word_counts.min()}, max={word_counts.max()}, "
-          f"mean={word_counts.mean():.1f}, median={word_counts.median():.1f}, "
-          f"std={word_counts.std():.1f}")
+    print(f"    min={word_counts.min()}, max={word_counts.max()}, " f"mean={word_counts.mean():.1f}, median={word_counts.median():.1f}, " f"std={word_counts.std():.1f}")
     print(f"  Kaydedildi          : {out_path}")
     print(f"------------------------")
 
@@ -331,23 +321,22 @@ def clean_ai_data():
 # ========================
 
 HUMAN_CLEANED_CSV = OUR_CLEANED_DIR / "cleaned_human_all.csv"
-AI_CLEANED_CSV    = OUR_CLEANED_DIR / "cleaned_ai_all.csv"
-FINAL_CSV         = OUR_CLEANED_DIR / "final_dataset.csv"
+AI_CLEANED_CSV = OUR_CLEANED_DIR / "cleaned_ai_all.csv"
+FINAL_CSV = OUR_CLEANED_DIR / "final_dataset.csv"
 
 
 def _check_dataframe(df: pd.DataFrame, label: str) -> None:
     """Print per-file quality summary."""
     wc = df["text"].str.split().str.len()
     null_count = df["text"].isna().sum() + (df["text"].astype(str).str.strip() == "").sum()
-    dup_count  = df.duplicated(subset=["text"]).sum()
+    dup_count = df.duplicated(subset=["text"]).sum()
     is_gen_vals = df["isGenerated"].unique().tolist()
     print(f"  [{label}]")
     print(f"    Satir sayisi  : {len(df)}")
     print(f"    Null/bos text : {null_count}")
     print(f"    Duplicate text: {dup_count}")
     print(f"    isGenerated   : {is_gen_vals}")
-    print(f"    Kelime sayisi : min={wc.min()}, max={wc.max()}, "
-          f"mean={wc.mean():.1f}, median={wc.median():.1f}, std={wc.std():.1f}")
+    print(f"    Kelime sayisi : min={wc.min()}, max={wc.max()}, " f"mean={wc.mean():.1f}, median={wc.median():.1f}, std={wc.std():.1f}")
 
 
 def build_final_ourDataset() -> None:
@@ -367,9 +356,9 @@ def build_final_ourDataset() -> None:
     # ---- 1. Yükle ve kontrol et ----
     print("\n-- Ön kontrol --")
     human_df = pd.read_csv(HUMAN_CLEANED_CSV)
-    ai_df    = pd.read_csv(AI_CLEANED_CSV)
+    ai_df = pd.read_csv(AI_CLEANED_CSV)
     _check_dataframe(human_df, "cleaned_human_all.csv")
-    _check_dataframe(ai_df,    "cleaned_ai_all.csv")
+    _check_dataframe(ai_df, "cleaned_ai_all.csv")
 
     # ---- 2. Birleştir ----
     # Her iki df'de ortak olan sütunları koru; eksik olanlar NaN kalır
@@ -380,8 +369,8 @@ def build_final_ourDataset() -> None:
 
     # ---- 3. Cross-duplicate kontrolü ----
     texts_human = set(human_df["text"].astype(str).str.strip())
-    texts_ai    = set(ai_df["text"].astype(str).str.strip())
-    cross_dups  = texts_human & texts_ai
+    texts_ai = set(ai_df["text"].astype(str).str.strip())
+    cross_dups = texts_human & texts_ai
 
     # ---- 4. Shuffle ----
     combined = combined.sample(frac=1, random_state=42).reset_index(drop=True)
@@ -391,9 +380,9 @@ def build_final_ourDataset() -> None:
 
     # ---- 6. Özet rapor ----
     wc_human = combined.loc[combined["isGenerated"] == 0, "text"].str.split().str.len()
-    wc_ai    = combined.loc[combined["isGenerated"] == 1, "text"].str.split().str.len()
-    n_human  = (combined["isGenerated"] == 0).sum()
-    n_ai     = (combined["isGenerated"] == 1).sum()
+    wc_ai = combined.loc[combined["isGenerated"] == 1, "text"].str.split().str.len()
+    n_human = (combined["isGenerated"] == 0).sum()
+    n_ai = (combined["isGenerated"] == 1).sum()
 
     print(f"\n--- FINAL DATASET RAPORU ---")
     print(f"  Toplam satir        : {len(combined)}")
