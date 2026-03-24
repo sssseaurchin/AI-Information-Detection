@@ -10,7 +10,7 @@ eval:
 	docker compose run --rm aid python -m src.cnn.main --eval-only
 
 eval-manifest:
-	docker compose run --rm aid python -m src.cnn.main --eval-only --split-manifest /app/src/cnn/splits/split_manifest.csv
+	docker compose run --rm aid python -m src.cnn.main --eval-only --split-manifest /app/Dataset/prepared/combined_train/split_manifest.csv
 
 eval-report:
 	docker compose run --rm aid python -m src.cnn.main --eval-only --report-dir /app/reports

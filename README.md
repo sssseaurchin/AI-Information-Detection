@@ -1,64 +1,92 @@
 # AID
 
-### AI Information Detection Tool
+AI Information Detection is a graduation project focused on real vs synthetic image detection. The active research and training workflow is centered on the CNN pipeline under `src/cnn/`.
 
-## Project Overview
+## Current Scope
 
-This is a graduation project for SE4910 & COMP4910. It consists of a basic frontend, gateway, and two neural networks.
-The goal of the project is to be a tool to detect AI generated media.
+- image-level real vs synthetic classification
+- Docker-first training and evaluation
+- manifest-based dataset splits
+- dataset hygiene utilities for corrupt, oversized, and duplicate samples
+- calibration, corruption evaluation, and slice reports
+- multi-backbone benchmarking
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow?logo=javascript&logoColor=black)
-![HTML](https://img.shields.io/badge/HTML5-standard-orange?logo=html5&logoColor=white)
-![CSS](https://img.shields.io/badge/CSS3-standard-blue?logo=css3&logoColor=white)
+The prepared training dataset is expected under `Dataset/prepared/combined_train`.
 
----
+## Main Paths
 
-## Repository Structure
+| Area | Path |
+| --- | --- |
+| CNN pipeline | [src/cnn/CNN.md](./src/cnn/CNN.md) |
+| Docker usage | [docs/DOCKER_USAGE.md](./docs/DOCKER_USAGE.md) |
+| Compose services | [docker-compose.yml](./docker-compose.yml) |
+| Docker image | [Dockerfile](./Dockerfile) |
+| Helper commands | [Makefile](./Makefile), [run.ps1](./run.ps1) |
 
-| Component            | Documentation                          |
-| -------------------- | -------------------------------------- |
-| **Frontend**         | [Main Directory](./src/frontend) |
-| **Server**           | [Main Directory](./src/flask_server) |
-| **LSTM Model** | [Main Directory](./src/lstm) |
-| **CNN Model** | [README](./src/cnn/CNN.md) |
+## Supported CNN Architectures
 
----
+- `simple`
+- `dual_artifact_cnn`
+- `efficientnet_b0`
+- `efficientnet_v2b0`
+- `resnet50`
+- `convnext_tiny`
+- `clip_vit_b32`
 
-## Project Structure
+## Quick Start
 
-- `src/cnn/` contains the CNN application code, evaluation pipeline, and governance logic.
-- `docs/` contains project documentation, including [Docker usage](./docs/DOCKER_USAGE.md).
-- The repository root contains build and entrypoint files such as `Dockerfile`, `docker-compose.yml`, `Makefile`, and `run.ps1`.
-
-## Governance Baseline
-
-`--eval-only` runs use an immutable governance baseline stored at `governance/baseline.json`.
-
-- The first research-valid evaluation creates the baseline from the current governance config, split manifest, model file, and label mapping hashes.
-- Later research-valid evaluations must match that baseline exactly.
-- Hash drift blocks the run with exit code `2`.
-- `--override-governance` allows exploratory evaluation to proceed, but the run is marked invalid for research reporting and the baseline is not updated.
-- Access logs are persisted at `governance/access_log.jsonl`.
-
-Minimal verification flow:
-
-```bash
-docker compose run --rm aid python -m src.cnn.main --eval-only
-docker compose run --rm aid python -m src.cnn.main --eval-only
-docker compose run --rm aid python -m src.cnn.main --eval-only --override-governance
-```
-
-## How To Run (Docker-Only)
-
-Host `python` is not supported for this repo. Always run through Docker.
-
-Detailed usage notes are in [docs/DOCKER_USAGE.md](./docs/DOCKER_USAGE.md).
+Build:
 
 ```bash
 docker compose build aid
-docker compose run --rm aid python -m src.cnn.main
-docker compose run --rm aid python -m src.cnn.main --eval-only
-docker compose run --rm aid python -m src.cnn.main --eval-only --split-manifest /app/src/cnn/splits/split_manifest.csv
-docker compose run --rm aid python -m src.cnn.main --eval-only --report-dir /app/reports
 ```
+
+Train:
+
+```bash
+docker compose run --rm aid python -m src.cnn.main
+```
+
+GPU train:
+
+```bash
+docker compose --profile gpu run --rm aid-gpu python -m src.cnn.main
+```
+
+Eval:
+
+```bash
+docker compose run --rm aid python -m src.cnn.main --eval-only
+```
+
+Eval with the active prepared manifest:
+
+```bash
+docker compose run --rm aid python -m src.cnn.main --eval-only --split-manifest /app/Dataset/prepared/combined_train/split_manifest.csv
+```
+
+## Dataset Preflight
+
+Corrupt and suspicious image scan:
+
+```bash
+docker compose run --rm aid python -m src.cnn.clean_corrupt_images --dataset-path /app/Dataset/prepared/combined_train --report-only
+```
+
+Duplicate audit:
+
+```bash
+docker compose run --rm aid python -m src.cnn.audit_duplicates --manifest-path /app/Dataset/prepared/combined_train/split_manifest.csv --output-dir /app/reports/duplicate_audit
+```
+
+Fix exact duplicate train/val leakage using an existing audit:
+
+```bash
+docker compose run --rm aid python -m src.cnn.fix_exact_duplicate_split_leakage --manifest-path /app/Dataset/prepared/combined_train/split_manifest.csv --exact-duplicates-path /app/reports/duplicate_audit/exact_duplicates.csv --backup
+```
+
+## Notes
+
+- The project is intended to be run through Docker.
+- Newer baselines such as `clip_vit_b32` require rebuilding the image so fresh dependencies are installed.
+- Reports and generated benchmark artifacts are written into the repository because the project root is bind-mounted to `/app`.
