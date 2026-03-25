@@ -1,8 +1,6 @@
 import os
 from typing import Callable
 import tensorflow as tf
-import pywt
-import PIL.Image as Image
 import numpy as np
 
 SUPPORTED_PREPROCESS_MODES = {"rgb", "sobel", "rgb+sobel", "dwt"}
