@@ -42,7 +42,6 @@ def verify_model_existence(model_name=None) -> dict:
 
 
 def get_model_summary(model_name=DEF_MODEL_NAME) -> dict:  # dict:{"status":200|404, "errorMsg":}
-
     pass
 
 
