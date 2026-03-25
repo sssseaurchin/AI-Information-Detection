@@ -39,7 +39,7 @@ def parse_args():
     parser.add_argument(
         "--preprocess-mode",
         default=get_default_preprocess_mode(),
-        choices=["rgb", "sobel", "rgb+sobel"],
+        choices=["rgb", "sobel", "rgb+sobel", "dwt"],
         help="Shared preprocessing mode used by training and inference.",
     )
     parser.add_argument(

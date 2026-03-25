@@ -1,11 +1,10 @@
 import os
 from typing import Callable
-
 import tensorflow as tf
+import pywt
+import PIL.Image as Image
 
-
-SUPPORTED_PREPROCESS_MODES = {"rgb", "sobel", "rgb+sobel"}
-
+SUPPORTED_PREPROCESS_MODES = {"rgb", "sobel", "rgb+sobel", "dwt"}
 
 def get_default_preprocess_mode() -> str:
     """Read the shared preprocessing mode used by training and inference."""
@@ -36,6 +35,17 @@ def _sobel_from_rgb(img: tf.Tensor, image_size: tuple[int, int]) -> tf.Tensor:
     edges = tf.squeeze(edges, axis=-1)
     return tf.stack([edges, edges, edges], axis=-1)
 
+def _discrete_wavelet(img: tf.Tensor, image_size: tuple[int, int]) -> tf.Tensor:
+    """Convert an RGB tensor into a normalized 3-channel discrete wavelet transform image."""
+    img = tf.rgb_to_grayscale(img)
+    dwt = pywt.dwt2(img.numpy(), 'haar')
+    
+    image = Image.fromarray((dwt[0] * 255).astype('uint8'))
+    image.show()
+    
+    dwt = tf.convert_to_tensor(dwt[0], dtype=tf.float32)
+    
+    return dwt
 
 def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: str = "rgb") -> tuple[tf.Tensor, int]:
     """Apply the repository's shared preprocessing pipeline for a chosen mode."""
@@ -43,16 +53,25 @@ def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: s
     if normalized_mode not in SUPPORTED_PREPROCESS_MODES:
         raise ValueError(f"Unsupported preprocessing mode: {mode}")
 
-    rgb = _decode_rgb_image(path, image_size)
+    
     if normalized_mode == "rgb":
+        rgb = _decode_rgb_image(path, image_size)
         return rgb, label
 
-    sobel = _sobel_from_rgb(rgb, image_size)
     if normalized_mode == "sobel":
+        rgb = _decode_rgb_image(path, image_size)
+        sobel = _sobel_from_rgb(rgb, image_size)
         return sobel, label
-
-    combined = tf.clip_by_value((rgb + sobel) / 2.0, 0.0, 1.0)
-    return combined, label
+    
+    if normalized_mode == "rgb+sobel":
+        rgb = _decode_rgb_image(path, image_size)
+        sobel = _sobel_from_rgb(rgb, image_size)
+        return tf.clip_by_value((rgb + sobel) / 2.0, 0.0, 1.0), label
+    
+    if normalized_mode == "dwt":
+        rgb = _decode_rgb_image(path, image_size)
+        dwt = _discrete_wavelet(rgb, image_size)
+        return dwt, label
 
 
 def get_preprocess_fn(mode: str | None = None) -> Callable[[str, int, tuple[int, int]], tuple[tf.Tensor, int]]:
