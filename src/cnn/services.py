@@ -1,51 +1,52 @@
-import os
-# --- DİKKAT: BU SATIRLAR EN TEPEDE OLMAK ZORUNDA ---
-# Başka hiçbir import yapmadan önce bunu ayarlamalıyız.
-os.environ["TF_USE_LEGACY_KERAS"] = "1"
-# ---------------------------------------------------
+from pathlib import Path
+import numpy as np
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+import logging
 
-# ŞİMDİ diğerlerini çağırabiliriz
-import cnnModel
-import tensorflow as tf
+# Support both module and direct execution
+if __package__:
+    from .cnnModel import predict_image
+else:
+    from cnnModel import predict_image
 
-"""def cnn_analyze_image(image_name:str):
-    path = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(path, "model", "ai_detection_model.h5")
-    # path'i str() içine alıyoruz
-    image_name = str(path) + "\\Model\\" + image_name    
-    model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-    prediction = cnnModel.predict_image(model, image_name)
+path = Path(__file__).resolve().parent
 
-    print(f"Prediction for image {image_name}: {prediction}")"""
+DEF_MODEL_NAME = "efficientnet_v2b0_rgb_20260325.h5"
+MODELS_FOLDER = path / "models"
 
-MODEL_NAME = "ai_detection_model.h5"
 
-def cnn_analyze_image(image_name):
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+def cnn_analyze_image(image_path, model_name=DEF_MODEL_NAME):
+    MODEL_PATH = MODELS_FOLDER / model_name
 
-    
-    MODEL_PATH = os.path.join(current_dir, "model", MODEL_NAME) 
-    
-    final_image_path = os.path.join(current_dir, "model", image_name)
+    model = load_model(MODEL_PATH, compile=False)  # LOAD MODEL
+    logging.info(f"stringified image_path: {str(image_path)}")
+    score = predict_image(
+        model=model,
+        image_path=str(image_path),
+        image_size=(224, 224),
+        preprocessing_func=None,
+        preprocess_mode="rgb",
+    )
 
-    print(f"DEBUG: Model Yolu: {MODEL_PATH}")
-    print(f"DEBUG: Resim Yolu: {final_image_path}")
+    return score
 
-    try:
-        model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-        print("MODEL YUKLENDI")
-        prediction = cnnModel.predict_image(model, final_image_path, preprocessing_func=cnnModel.preprocess_sobel_edge)
-        
-        print(f"Prediction result: {prediction}")
-        
-        return prediction
-    except Exception as e:
-        print(f"HATA (CNN Analiz): {e}")
-        # Hata durumunda -1 veya hata mesajı dönebilirsin
-        return -1
-    
 
-if __name__ == "__main__": 
-    cnn_analyze_image(r"ai_woman.jpg")
-    # prayers
-            
+def verify_model_existence(model_name=None) -> dict:
+    """if we want to change the model used for image detect. on runtime
+    mode_name: name of the model with .h5 extension, should be inside model folder
+    Return: # dict:{"status":200|404, "errorMsg":}
+    """
+
+    pass
+
+
+def get_model_summary(model_name=DEF_MODEL_NAME) -> dict:  # dict:{"status":200|404, "errorMsg":}
+
+    pass
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    pred = cnn_analyze_image(image_path=path.parent / "uploaded_images" / "53aee66c20d04fbf9ac83904648b1305.jpg")
+    logging.info(f"Predicted confidence: {pred}")
