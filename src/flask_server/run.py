@@ -2,6 +2,7 @@ from utility import save_image_from_base64
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from lstm.services import analyze_text as lstm_analyze_text
+from lstm.services import ping_text_analysis_side as ping_text
 from cnn.services import cnn_analyze_image
 
 app = Flask(__name__)
@@ -12,12 +13,17 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 @app.get("/")
 def index():
-    return jsonify({"message": "Welcome to homepage!"})
+    return jsonify({"message": "Welcome to the server homepage"})
 
 
 @app.get("/ping")
 def ping():
     return jsonify({"message": "pong"})
+
+
+@app.get("/ping_text_side")
+def ping_text_side():
+    return lstm_analyze_text.ping_text()
 
 
 @app.post("/analyze_image")
@@ -46,6 +52,7 @@ def analyze_image():
         return jsonify({"error": f"Image analysis failed: {e}"}), 500
 
     return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
+    return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
 
 
 @app.post("/analyze_text")
@@ -66,6 +73,8 @@ def analyze_text():
     print(f"Text analyzed with confidence: {confidence}")
     return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
 
+    return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
+
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=1337, debug=True)

@@ -1,0 +1,10 @@
+{
+  "selection_metric": "roc_auc",
+  "tuning_split_preference": ["calibration", "val"],
+  "held_out_splits": ["test", "real_world"],
+  "max_heldout_evals_per_day": 1,
+  "require_manifest": true,
+  "require_label_mapping_hash": true,
+  "require_split_policy_frozen": true,
+  "allow_subset_tuning": true
+}

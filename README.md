@@ -24,3 +24,41 @@ The goal of the project is to be a tool to detect AI generated media.
 | **CNN Model** | [README](./src/cnn/CNN.md) |
 
 ---
+
+## Project Structure
+
+- `src/cnn/` contains the CNN application code, evaluation pipeline, and governance logic.
+- `docs/` contains project documentation, including [Docker usage](./docs/DOCKER_USAGE.md).
+- The repository root contains build and entrypoint files such as `Dockerfile`, `docker-compose.yml`, `Makefile`, and `run.ps1`.
+
+## Governance Baseline
+
+`--eval-only` runs use an immutable governance baseline stored at `governance/baseline.json`.
+
+- The first research-valid evaluation creates the baseline from the current governance config, split manifest, model file, and label mapping hashes.
+- Later research-valid evaluations must match that baseline exactly.
+- Hash drift blocks the run with exit code `2`.
+- `--override-governance` allows exploratory evaluation to proceed, but the run is marked invalid for research reporting and the baseline is not updated.
+- Access logs are persisted at `governance/access_log.jsonl`.
+
+Minimal verification flow:
+
+```bash
+docker compose run --rm aid python -m src.cnn.main --eval-only
+docker compose run --rm aid python -m src.cnn.main --eval-only
+docker compose run --rm aid python -m src.cnn.main --eval-only --override-governance
+```
+
+## How To Run (Docker-Only)
+
+Host `python` is not supported for this repo. Always run through Docker.
+
+Detailed usage notes are in [docs/DOCKER_USAGE.md](./docs/DOCKER_USAGE.md).
+
+```bash
+docker compose build aid
+docker compose run --rm aid python -m src.cnn.main
+docker compose run --rm aid python -m src.cnn.main --eval-only
+docker compose run --rm aid python -m src.cnn.main --eval-only --split-manifest /app/src/cnn/splits/split_manifest.csv
+docker compose run --rm aid python -m src.cnn.main --eval-only --report-dir /app/reports
+```
