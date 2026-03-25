@@ -1,4 +1,4 @@
-from .utility import save_image_from_base64
+from utility import save_image_from_base64
 from flask import Flask, jsonify, request
 from lstm.services import analyze_text as lstm_analyze_text
 from cnn.services import cnn_analyze_image
