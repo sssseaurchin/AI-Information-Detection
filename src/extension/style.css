@@ -57,7 +57,7 @@ body {
     align-items: baseline;
     justify-content: center;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 4px;
 }
 
 .logo-big {
@@ -81,13 +81,13 @@ body {
 }
 
 .last-input-preview {
-    margin: 8px 0;
+    margin: 5px 0;
     padding: 8px;
     background: var(--bg-input);
     border-radius: 8px;
     height: auto;
     min-height: 40px;
-    max-height: 120px;
+    max-height: 140px;
     overflow: hidden;
     display: flex;
     justify-content: center;
@@ -97,7 +97,7 @@ body {
 
 .last-input-preview img {
     max-width: 100%;
-    max-height: 100px;
+    max-height: 130px;
     object-fit: contain;
     border-radius: 4px;
 }
@@ -264,10 +264,9 @@ h3 {
     transform: translateX(100%);
     visibility: hidden;
 
-    transition:
-            opacity 0.3s var(--ease),
-            transform 0.3s var(--ease),
-            visibility 0.3s var(--ease);
+    transition: opacity 0.3s var(--ease),
+    transform 0.3s var(--ease),
+    visibility 0.3s var(--ease);
 }
 
 .full-view-overlay.active {
@@ -295,18 +294,35 @@ h3 {
 }
 
 .secondary-btn {
-    background: var(--bg-input);
+    background: var(--bg-card);
     color: var(--text-primary);
-    border: 1px solid var(--border-idle);
-    padding: 5px 10px;
-    border-radius: 6px;
+    border: 1px solid rgba(165, 165, 165, 0.3);
+    padding: 6px 12px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 10px;
     font-weight: bold;
+    outline: none;
+
+    transition:
+            background var(--duration) var(--ease),
+            border-color var(--duration) var(--ease),
+            transform var(--duration) var(--ease);
 }
 
 .secondary-btn:hover {
-    background: var(--bg-input-hover);
+    background: var(--bg-input);
+    border-color: var(--border-idle);
+    color: var(--text-primary);
+}
+
+.secondary-btn:active {
+    transform: scale(0.96);
+}
+
+.secondary-btn.selected {
+    background: var(--bg-input);
+    border-color: #3b82f6;
 }
 
 .modal-body {
