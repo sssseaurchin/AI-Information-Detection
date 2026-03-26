@@ -79,8 +79,16 @@ def noise_residual(path: str) -> tf.Tensor:
 
 # ----------------------------FREQUENCY FEATURES----------------------------
 
-def frequency_log_spectrum(path: str) -> tf.Tensor:
-    return fft_spectrum(path)
+def frequency_log_spectrum(path: str, size: tuple[int, int] = (224, 224)) -> tf.Tensor:
+    img = image_read(path)
+    img = tf.image.rgb_to_grayscale(img)
+    img = tf.image.resize(img, size)
+    fft = tf.signal.fft2d(tf.cast(img, tf.complex64))
+    magnitude = tf.abs(fft)
+    log_spectrum = tf.math.log(magnitude + 1e-8)
+    log_spectrum = tf.signal.fftshift(log_spectrum) # Shift the zero-frequency component to the center of the spectrum
+
+    return log_spectrum
 
 def frequency_mean(path: str) -> tf.Tensor:
     spec = fft_spectrum(path)
@@ -104,11 +112,11 @@ def frequency_high(path: str) -> tf.Tensor:
     high_freq = tf.reduce_mean(spec[spec > tf.reduce_mean(spec)])
     return high_freq
 
+# TODO fix math
 def radial_spectrum(path: str) -> tf.Tensor:
     # Computes the radial spectrum by averaging the FFT spectrum values in concentric circles around the center of the spectrum.
     spec = fft_spectrum(path)
-    
-    h, w = spec.shape
+    h, w, d = spec.shape
     cy, cx = h//2, w//2
 
     y = tf.range(h)

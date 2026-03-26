@@ -8,8 +8,9 @@ def image_read(path: str) -> tf.Tensor:
     
     return img
 
-def fft_spectrum(image):
-    img = image_read(image)
+def fft_spectrum(path: str) -> tf.Tensor:
+    img = image_read(path)
+    img = tf.image.rgb_to_grayscale(img)
     fft = tf.signal.fft2d(tf.cast(img, tf.complex64))
     magnitude = tf.abs(fft)
     log_spectrum = tf.math.log(magnitude + 1e-8)
