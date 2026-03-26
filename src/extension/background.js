@@ -58,38 +58,80 @@ async function fetchAndCompress(url) {
 }
 
 async function performBackgroundAnalysis(endpoint, payload) {
-    browser.action.setBadgeText({text: "..."});
-    browser.action.setBadgeBackgroundColor({color: "#aaaaaa"});
+    browser.action.setBadgeText({ text: "..." });
+    browser.action.setBadgeBackgroundColor({ color: "#aaaaaa" });
 
     try {
-        const res = await fetch(GATEWAY_URL + endpoint, {
+        const response = await fetch(GATEWAY_URL + endpoint, {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload)
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+            keepalive: true
         });
 
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        const data = await res.json();
+        const data = await response.json();
 
-        await browser.storage.local.set({lastResult: data});
+        const { history = [] } = await browser.storage.local.get("history");
+        const { lastInput } = await browser.storage.local.get("lastInput");
 
-        browser.action.setBadgeText({text: "!"});
-        browser.action.setBadgeBackgroundColor({color: "#22c55e"});
+        const newEntry = {
+            input: lastInput,
+            result: data,
+            timestamp: Date.now()
+        };
+
+        const updatedHistory = [newEntry, ...history].slice(0, 5);
+        await browser.storage.local.set({ history: updatedHistory });
+
+        browser.action.setBadgeText({ text: "!" });
+        browser.action.setBadgeBackgroundColor({ color: "#22c55e" });
 
         browser.notifications.create({
             type: "basic",
-            iconUrl: "icons/icon-48.png",
-            title: "AID Analysis Complete",
+            iconUrl: "icon.png",
+            title: "Analysis Complete",
             message: `Result: ${data.label}`
         });
 
     } catch (err) {
-        console.error("Analysis failed:", err);
+        console.error("Detailed Analysis Error:", err);
+
+        browser.action.setBadgeText({ text: "ERR" });
+        browser.action.setBadgeBackgroundColor({ color: "#ef4444" });
+
+        const { history = [] } = await browser.storage.local.get("history");
+        const { lastInput } = await browser.storage.local.get("lastInput");
+
+        const errorEntry = {
+            input: lastInput,
+            result: { label: "Error", confidence: 0, error: err.message },
+            timestamp: Date.now()
+        };
+
         await browser.storage.local.set({
-            lastResult: {label: "Error", confidence: 0, details: err.message}
+            history: [errorEntry, ...history].slice(0, 5)
         });
-        browser.action.setBadgeText({text: "X"});
-        browser.action.setBadgeBackgroundColor({color: "#ef4444"});
     }
+}
+
+async function addToHistory(input, result) {
+    const {history = []} = await browser.storage.local.get("history");
+
+    const newEntry = {
+        id: Date.now(),
+        input: input, // {type: 'image'|'text', content: '...'}
+        result: result, // {label: '...', confidence: 0.8}
+        timestamp: new Date().toLocaleTimeString()
+    };
+
+    const updatedHistory = [newEntry, ...history].slice(0, 5);
+
+    await browser.storage.local.set({
+        history: updatedHistory,
+        lastResult: result
+    });
 }
