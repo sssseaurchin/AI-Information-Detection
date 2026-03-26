@@ -12,6 +12,7 @@ from governance import (
     evaluate_governance_request,
     get_default_governance_config_path,
     load_governance_config,
+    requires_tuning_split,
     select_tuning_split_from_policy,
 )
 import hashlib
@@ -85,6 +86,16 @@ def parse_args():
     )
     parser.add_argument("--dataset-id", default=None, help="Optional dataset_id subset filter applied within the chosen manifest split.")
     parser.add_argument("--domain", default=None, help="Optional domain subset filter applied within the chosen manifest split.")
+    parser.add_argument(
+        "--tuning-manifest",
+        default=None,
+        help="Optional manifest used only for threshold/calibration tuning during evaluation.",
+    )
+    parser.add_argument(
+        "--tuning-split",
+        default=None,
+        help="Optional split name used inside --tuning-manifest during evaluation.",
+    )
     parser.add_argument(
         "--threshold-policy",
         default="youden",
@@ -224,11 +235,18 @@ def main():
     if args.eval_only:
         governance_config = load_governance_config(args.governance_config)
         manifest = load_manifest_dataframe(args.split_manifest)
-        tuning_split = select_tuning_split_from_policy(
-            manifest,
-            governance_config["tuning_split_preference"],
-            args.eval_split,
-        )
+        tuning_manifest = load_manifest_dataframe(args.tuning_manifest) if args.tuning_manifest else manifest
+        if requires_tuning_split(args.threshold_policy, args.calibrate):
+            if args.tuning_split:
+                tuning_split = args.tuning_split
+            else:
+                tuning_split = select_tuning_split_from_policy(
+                    tuning_manifest,
+                    governance_config["tuning_split_preference"],
+                    args.eval_split,
+                )
+        else:
+            tuning_split = "none"
         governance_result = evaluate_governance_request(
             governance_config=governance_config,
             governance_config_path=args.governance_config,
@@ -264,6 +282,8 @@ def main():
             dataset_id=args.dataset_id,
             domain=args.domain,
             tuning_split_preference=governance_config["tuning_split_preference"],
+            tuning_manifest_path=args.tuning_manifest,
+            tuning_split_override=args.tuning_split,
             governance_result=governance_result,
             forbid_test_tuning=args.forbid_test_tuning,
         )

@@ -340,17 +340,49 @@ def _fit_tuning_state(
     dataset_id: str | None = None,
     domain: str | None = None,
     tuning_split_preference: list[str] | None = None,
+    tuning_manifest: pd.DataFrame | None = None,
+    tuning_manifest_path: str | None = None,
+    tuning_split_override: str | None = None,
     forbid_test_tuning: bool = True,
 ) -> tuple[str, dict[str, Any], dict[str, Any]]:
-    tuning_split = select_tuning_split_from_policy(
-        manifest,
-        tuning_split_preference or ["calibration", "val"],
-        split_name,
-    )
+    if str(threshold_policy).lower() == "fixed" and str(calibrate).lower() == "none":
+        if fixed_threshold is None:
+            raise ValueError("A fixed threshold value is required when threshold_policy='fixed'.")
+        threshold_value = float(fixed_threshold)
+        if not 0.0 <= threshold_value <= 1.0:
+            raise ValueError("fixed_threshold must be between 0.0 and 1.0.")
+        return (
+            "none",
+            {"mode": "none", "fitted_on_split": None},
+            {
+                "policy": "fixed",
+                "threshold": threshold_value,
+                "selection_metric": None,
+                "selection_value": None,
+            },
+        )
+
+    tuning_source_manifest = tuning_manifest if tuning_manifest is not None else manifest
+    tuning_source_path = tuning_manifest_path if tuning_manifest_path is not None else "eval_manifest"
+    tuning_eval_reference_split = tuning_split_override or split_name
+
+    if tuning_split_override:
+        tuning_split = tuning_split_override
+        available = set(tuning_source_manifest["split"].astype(str).tolist())
+        if tuning_split not in available:
+            raise ValueError(
+                f"Requested tuning split '{tuning_split}' does not exist in tuning manifest: {tuning_source_path}"
+            )
+    else:
+        tuning_split = select_tuning_split_from_policy(
+            tuning_source_manifest,
+            tuning_split_preference or ["calibration", "val"],
+            tuning_eval_reference_split,
+        )
     if forbid_test_tuning and split_name in {"test", "real_world"} and tuning_split == split_name:
         raise ValueError(f"Threshold or calibration tuning on '{split_name}' is forbidden.")
 
-    tuning_frame = _get_split_frame(manifest, tuning_split, dataset_id=dataset_id, domain=domain)
+    tuning_frame = _get_split_frame(tuning_source_manifest, tuning_split, dataset_id=dataset_id, domain=domain)
     tuning_outputs = _extract_logits_and_probabilities(model, tuning_frame, preprocess_mode, image_size, batch_size)
     tuning_probs = np.asarray(tuning_outputs["probabilities"], dtype=float)
 
@@ -383,6 +415,8 @@ def run_evaluation(
     dataset_id: str | None = None,
     domain: str | None = None,
     tuning_split_preference: list[str] | None = None,
+    tuning_manifest_path: str | None = None,
+    tuning_split_override: str | None = None,
     governance_result: dict[str, Any] | None = None,
     forbid_test_tuning: bool = True,
     image_size: tuple[int, int] = (224, 224),
@@ -390,6 +424,7 @@ def run_evaluation(
 ) -> dict[str, Any]:
     """Run research-grade evaluation for a specific manifest split."""
     manifest = _load_manifest(manifest_path)
+    tuning_manifest = _load_manifest(tuning_manifest_path) if tuning_manifest_path else manifest
     label_mapping = load_label_mapping(label_config_path)
     label_mapping_hash = _hash_label_mapping(label_mapping)
 
@@ -414,6 +449,9 @@ def run_evaluation(
         dataset_id=dataset_id,
         domain=domain,
         tuning_split_preference=tuning_split_preference,
+        tuning_manifest=tuning_manifest,
+        tuning_manifest_path=tuning_manifest_path,
+        tuning_split_override=tuning_split_override,
         forbid_test_tuning=forbid_test_tuning,
     )
 
@@ -434,6 +472,7 @@ def run_evaluation(
         "run_id": run_id,
         "split_name": split_name,
         "tuning_split": tuning_split,
+        "tuning_manifest_path": os.path.abspath(tuning_manifest_path) if tuning_manifest_path else os.path.abspath(manifest_path),
         "dataset_version": _get_dataset_version(manifest),
         "manifest_path": os.path.abspath(manifest_path),
         "model_path": os.path.abspath(model_path),
