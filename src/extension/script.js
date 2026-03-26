@@ -99,10 +99,6 @@ document.getElementById("viewFullBtn").addEventListener("click", () => {
     fullView.style.display = "block";
 });
 
-document.getElementById("closeFullView").addEventListener("click", () => {
-    document.getElementById("fullViewModal").style.display = "none";
-});
-
 document.getElementById("viewFullBtn").addEventListener("click", () => {
     if (!currentActiveEntry) return;
 
@@ -125,7 +121,8 @@ document.getElementById("viewFullBtn").addEventListener("click", () => {
 });
 
 document.getElementById("closeFullView").addEventListener("click", () => {
-    document.getElementById("fullViewModal").classList.remove("active");
+    const overlay = document.getElementById("fullViewModal");
+    overlay.classList.remove("active");
 });
 
 document.getElementById("exportJson").addEventListener("click", (e) => {
