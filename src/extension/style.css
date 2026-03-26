@@ -26,7 +26,8 @@
 
 body {
     width: 250px;
-    height: 530px;
+    min-height: 330px;
+    max-height: 530px;
     margin: 0;
     background: var(--bg-page);
     color: var(--text-primary);

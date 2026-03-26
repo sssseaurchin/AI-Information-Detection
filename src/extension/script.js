@@ -138,3 +138,17 @@ document.getElementById("exportJson").addEventListener("click", (e) => {
     link.click();
     URL.revokeObjectURL(url);
 });
+
+document.getElementById("clearHistory").addEventListener("click", async () => {
+    await browser.storage.local.remove("history");
+
+    await browser.storage.local.remove("lastInput");
+
+    document.getElementById("idleState").style.display = "block";
+    document.getElementById("resultDisplay").style.display = "none";
+    document.getElementById("historySection").style.display = "none";
+
+    currentActiveEntry = null;
+
+    browser.action.setBadgeText({text: ""});
+});
