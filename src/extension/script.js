@@ -1,6 +1,5 @@
-
 document.addEventListener("DOMContentLoaded", async () => {
-    const { lastInput, lastResult } = await browser.storage.local.get(["lastInput", "lastResult"]);
+    const {lastInput, lastResult} = await browser.storage.local.get(["lastInput", "lastResult"]);
 
     if (lastInput) {
         document.getElementById("idleState").style.display = "none";
@@ -19,7 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (lastResult) {
-        browser.action.setBadgeText({ text: "" });
+        browser.action.setBadgeText({text: ""});
         renderResult(lastResult);
     }
 });
