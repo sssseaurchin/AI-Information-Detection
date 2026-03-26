@@ -1,15 +1,21 @@
+let currentActiveEntry = null;
+
 document.addEventListener("DOMContentLoaded", async () => {
-    const { history = [] } = await browser.storage.local.get("history");
+    const {history = []} = await browser.storage.local.get("history");
 
-    if (history.length > 0) {
-        document.getElementById("idleState").style.display = "none";
-        renderMainDisplay(history[0]);
-
-        if (history.length > 1) {
-            renderHistoryList(history.slice(1));
-        }
-    } else {
+    if (history.length === 0) {
         document.getElementById("idleState").style.display = "block";
+        return;
+    }
+
+    document.getElementById("idleState").style.display = "none";
+    browser.action.setBadgeText({text: ""});
+
+    currentActiveEntry = history[0];
+    renderMainDisplay(currentActiveEntry);
+
+    if (history.length > 1) {
+        renderHistoryList(history);
     }
 });
 
@@ -32,55 +38,106 @@ function renderMainDisplay(entry) {
         imgEl.style.display = "none";
     }
 
-    document.getElementById("resultLabel").textContent = entry.result.label || "Error";
+    document.getElementById("resultLabel").textContent = entry.result.label;
     document.getElementById("resultDetails").textContent = entry.result.details || entry.result.error || "";
 
-    if (entry.result.confidence) {
-        let current = 0;
-        const target = Math.round(entry.result.confidence * 100);
-        const animate = () => {
-            current++;
-            radial.style.setProperty("--value", current);
-            text.textContent = `${current}%`;
-            if (current < target) requestAnimationFrame(animate);
-        };
-        animate();
-    }
+    const val = Math.round((entry.result.confidence || 0) * 100);
+    radial.style.setProperty("--value", val);
+    text.textContent = `${val}%`;
 }
 
-function renderHistoryList(pastEntries) {
+function renderHistoryList(history) {
     const listContainer = document.getElementById("historyList");
     const section = document.getElementById("historySection");
 
-    if (!listContainer) return;
     section.style.display = "block";
     listContainer.innerHTML = "";
 
-    pastEntries.forEach((entry) => {
+    history.forEach((entry, index) => {
         const item = document.createElement("div");
         item.className = "history-item";
-        item.style.cursor = "pointer";
-
-        const typeIcon = entry.input.type === 'image' ? "🖼" : "|≡";
-        const label = entry.result.label || "Unknown";
-        const conf = Math.round((entry.result.confidence || 0) * 100);
+        if (entry === currentActiveEntry) item.classList.add("selected");
 
         item.innerHTML = `
-            <span>${typeIcon} <strong>${label}</strong></span>
-            <span class="history-conf">${conf}%</span>
+            <span>${entry.input.type === 'image' ? "🖼" : "||"} <strong>${entry.result.label}</strong></span>
+            <span class="history-conf">${Math.round(entry.result.confidence * 100)}%</span>
         `;
 
         item.addEventListener("click", () => {
-            renderMainDisplay(entry);
-            document.querySelectorAll(".history-item").forEach(el => el.classList.remove("selected"));
-            item.classList.add("selected");
+            if (currentActiveEntry === entry && index !== 0) {
+                currentActiveEntry = history[0];
+            } else {
+                currentActiveEntry = entry;
+            }
+
+            renderMainDisplay(currentActiveEntry);
+            renderHistoryList(history);
         });
 
         listContainer.appendChild(item);
     });
 }
 
-document.getElementById("clearHistory")?.addEventListener("click", async () => {
-    await browser.storage.local.remove(["history", "lastInput", "lastResult"]);
-    window.location.reload();
+document.getElementById("viewFullBtn").addEventListener("click", () => {
+    if (!currentActiveEntry) return;
+
+    const fullView = document.getElementById("fullViewModal");
+    const content = document.getElementById("fullViewContent");
+
+    let html = `<h2>${currentActiveEntry.result.label}</h2>`;
+    html += `<p><strong>Confidence:</strong> ${Math.round(currentActiveEntry.result.confidence * 100)}%</p>`;
+
+    if (currentActiveEntry.input.type === 'image') {
+        html += `<img src="${currentActiveEntry.input.content}" style="max-width:100%; border:1px solid #ccc;">`;
+    } else {
+        html += `<div style="background:#eee; padding:10px; border-radius:4px; font-family:monospace;">${currentActiveEntry.input.content}</div>`;
+    }
+
+    html += `<hr><p>${currentActiveEntry.result.details || "No further details provided."}</p>`;
+
+    content.innerHTML = html;
+    fullView.style.display = "block";
+});
+
+document.getElementById("closeFullView").addEventListener("click", () => {
+    document.getElementById("fullViewModal").style.display = "none";
+});
+
+document.getElementById("viewFullBtn").addEventListener("click", () => {
+    if (!currentActiveEntry) return;
+
+    const overlay = document.getElementById("fullViewModal");
+    const content = document.getElementById("fullViewContent");
+
+    let html = `<h3 style="margin-top:0;">${currentActiveEntry.result.label}</h3>`;
+    html += `<p style="font-size:11px; color:var(--text-muted); margin-top:-10px; margin-bottom:15px;">Confidence: ${Math.round(currentActiveEntry.result.confidence * 100)}%</p>`;
+
+    if (currentActiveEntry.input.type === 'image') {
+        html += `<img src="${currentActiveEntry.input.content}" style="width:100%; border-radius:8px; margin-bottom:10px; border:1px solid var(--border-idle);">`;
+    } else {
+        html += `<div class="full-text-box">${currentActiveEntry.input.content}</div>`;
+    }
+
+    html += `<p style="font-size:12px; line-height:1.4; margin-top:15px;">${currentActiveEntry.result.details || "No details provided."}</p>`;
+
+    content.innerHTML = html;
+    overlay.classList.add("active");
+});
+
+document.getElementById("closeFullView").addEventListener("click", () => {
+    document.getElementById("fullViewModal").classList.remove("active");
+});
+
+document.getElementById("exportJson").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!currentActiveEntry) return;
+
+    const dataStr = JSON.stringify(currentActiveEntry, null, 2);
+    const blob = new Blob([dataStr], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `AID_${currentActiveEntry.result.label}_${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
 });

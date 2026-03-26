@@ -28,6 +28,18 @@
             </div>
             <h3 id="resultLabel"></h3>
             <p id="resultDetails"></p>
+            <button id="viewFullBtn" class="view-full-btn">View Full Details</button>
+        </div>
+
+        <div id="fullViewModal" class="full-view-overlay">
+            <div class="full-view-card">
+                <div class="modal-header">
+                    <button id="closeFullView" class="secondary-btn">← Back</button>
+                    <button id="exportJson" class="secondary-btn">to JSON</button>
+                </div>
+                <div id="fullViewContent" class="modal-body">
+                </div>
+            </div>
         </div>
         <div id="historySection" class="history-section">
             <h4>Recent Scans</h4>

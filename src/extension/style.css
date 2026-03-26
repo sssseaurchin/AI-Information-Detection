@@ -18,8 +18,7 @@
     --bg-page: #0f0f0f;
     --bg-card: #161616;
     --bg-input: #2a2a2a;
-    --bg-input-hover: #5ac7d1;
-    --bg-input-focus: #27ed7d;
+    --bg-input-hover: #333333;
     --border-idle: #494949;
     --text-primary: #ffffff;
     --text-muted: #aaaaaa;
@@ -27,18 +26,32 @@
 
 body {
     width: 250px;
-    min-height: 250px;
+    height: 480px;
     margin: 0;
     background: var(--bg-page);
     color: var(--text-primary);
+    overflow: hidden;
+}
+
+::-webkit-scrollbar {
+    width: 3px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-idle);
+    border-radius: 10px;
 }
 
 .container {
     text-align: center;
     padding: 10px;
+    height: 100%;
 }
 
-/* --- Header --- */
 .header-row {
     display: flex;
     align-items: baseline;
@@ -62,15 +75,17 @@ body {
     border-radius: 16px;
     border: 1px solid var(--border-idle);
     background: var(--bg-card);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
-/* --- NEW: Context Preview Styles --- */
 .last-input-preview {
-    margin: 12px 0;
+    margin: 10px 0;
     padding: 8px;
     background: var(--bg-input);
     border-radius: 8px;
-    max-height: 120px;
+    max-height: 100px;
     overflow: hidden;
     display: flex;
     justify-content: center;
@@ -79,17 +94,17 @@ body {
 
 .last-input-preview img {
     max-width: 100%;
-    max-height: 100px;
+    max-height: 80px;
     object-fit: contain;
     border-radius: 4px;
 }
 
 .text-preview {
     font-style: italic;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
     margin: 0;
-    line-height: 1.4;
+    line-height: 1.3;
 }
 
 .idle-state {
@@ -98,22 +113,20 @@ body {
     color: var(--text-muted);
     border: 1px dashed var(--border-idle);
     border-radius: 8px;
-    line-height: 1.5;
 }
 
-/* --- Results Area --- */
 .result-display {
-    margin-top: 15px;
-    padding-top: 15px;
+    margin-top: 10px;
+    padding-top: 10px;
     border-top: 1px solid var(--border-idle);
 }
 
 .radial {
-    --size: 90px;
-    --thickness: 14px;
+    --size: 80px;
+    --thickness: 12px;
     width: var(--size);
     height: var(--size);
-    margin: 0 auto 12px;
+    margin: 0 auto 10px;
     border-radius: 50%;
     position: relative;
     display: grid;
@@ -134,56 +147,91 @@ body {
 
 .radial-text {
     position: relative;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
     z-index: 1;
 }
 
 h3 {
-    margin: 8px 0 4px;
-    font-size: 18px;
+    margin: 5px 0;
+    font-size: 16px;
 }
 
 #resultDetails {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
     margin: 0;
+    max-height: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.view-full-btn {
+    display: block;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 8px 0;
+    margin-top: 5px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-align: center;
+    text-transform: uppercase;
+    transition: color var(--duration) var(--ease);
+}
+
+.view-full-btn:hover {
+    color: var(--text-primary);
 }
 
 .history-section {
-    margin-top: 20px;
+    margin-top: 15px;
     padding-top: 10px;
     border-top: 1px double var(--border-idle);
     text-align: left;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .history-section h4 {
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin-bottom: 8px;
+    margin: 0 0 8px 0;
+}
+
+#historyList {
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .history-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 6px 0;
-    font-size: 12px;
-    border-bottom: 1px solid var(--bg-input);
+    padding: 6px 8px;
+    font-size: 11px;
+    border-radius: 6px;
+    transition: background var(--duration) var(--ease);
+    cursor: pointer;
 }
 
-.history-item:last-child {
-    border: none;
+.history-item:hover {
+    background: var(--bg-input);
 }
 
-.history-label {
-    font-weight: bold;
+.history-item.selected {
+    background: var(--bg-input);
+    border-left: 2px solid #3b82f6;
 }
 
 .history-conf {
     color: #22c55e;
-    font-size: 10px;
+    font-weight: bold;
 }
 
 .clear-btn {
@@ -193,7 +241,8 @@ h3 {
     color: #ef4444;
     font-size: 10px;
     cursor: pointer;
-    margin-top: 10px;
+    margin-top: auto;
+    padding: 8px 0;
     opacity: 0.6;
 }
 
@@ -201,19 +250,70 @@ h3 {
     opacity: 1;
 }
 
-.history-item {
-    transition: background 0.1s var(--ease), padding-left 0.2s var(--ease);
-    border-radius: 4px;
-    padding: 6px 4px;
+.full-view-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-page);
+    z-index: 10000;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s var(--ease), visibility 0.2s;
 }
 
-.history-item:hover {
+.full-view-overlay.active {
+    visibility: visible;
+    opacity: 1;
+}
+
+.full-view-card {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-card);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-idle);
+}
+
+.secondary-btn {
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border-idle);
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    transition: all var(--duration) var(--ease);
+}
+
+.secondary-btn:hover {
     background: var(--bg-input-hover);
-    padding-left: 8px; /* Subtle "nudge" effect */
+    transform: translateY(-1px);
 }
 
-.history-item.selected {
-    background: var(--bg-input-focus);
-    border-left: 3px solid #3b82f6;
-    padding-left: 8px;
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    text-align: left;
+    padding-right: 5px;
+}
+
+.full-text-box {
+    background: var(--bg-input);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    white-space: pre-wrap;
 }
