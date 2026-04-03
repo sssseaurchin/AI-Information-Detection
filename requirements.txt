@@ -7,3 +7,5 @@ tensorflow==2.19.0
 kagglehub==0.3.13
 datasets==4.4.2
 scikit-image==0.25.2
+Pillow==11.3.0
+transformers==4.46.3

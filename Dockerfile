@@ -14,4 +14,4 @@ RUN pip install --upgrade pip && \
 
 COPY . /app
 
-CMD ["python3", "-m", "main"]
+CMD ["python3", "-m", "src.cnn.main"]

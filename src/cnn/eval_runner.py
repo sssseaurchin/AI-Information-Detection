@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 import pandas as pd
@@ -81,7 +81,7 @@ def _build_dataset(frame: pd.DataFrame, preprocess_mode: str, image_size: tuple[
         deterministic=False,
     )
     dataset = dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
-    dataset = dataset.apply(tf.data.experimental.ignore_errors())
+    dataset = dataset.ignore_errors()
     dataset = dataset.batch(batch_size, drop_remainder=False)
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
     return dataset
@@ -189,6 +189,13 @@ def _report_paths(report_dir: str, run_id: str) -> tuple[str, str]:
     return metrics_path, summary_path
 
 
+def _slice_report_paths(report_dir: str, run_id: str) -> tuple[str, str]:
+    os.makedirs(report_dir, exist_ok=True)
+    metrics_path = os.path.join(report_dir, f"{run_id}_slices.json")
+    summary_path = os.path.join(report_dir, f"{run_id}_slices.md")
+    return metrics_path, summary_path
+
+
 def _write_report_files(report_dir: str, run_id: str, report: dict[str, Any]) -> tuple[str, str]:
     metrics_path, summary_path = _report_paths(report_dir, run_id)
     with open(metrics_path, "w", encoding="utf-8") as handle:
@@ -247,6 +254,153 @@ def _write_report_files(report_dir: str, run_id: str, report: dict[str, Any]) ->
     return metrics_path, summary_path
 
 
+def _write_slice_report_files(report_dir: str, run_id: str, report: dict[str, Any]) -> tuple[str, str]:
+    metrics_path, summary_path = _slice_report_paths(report_dir, run_id)
+    with open(metrics_path, "w", encoding="utf-8") as handle:
+        json.dump(report, handle, indent=2)
+
+    lines = [
+        f"# Slice Evaluation Summary - {run_id}",
+        "",
+        f"- Split: `{report['split_name']}`",
+        f"- Tuning split: `{report['tuning_split']}`",
+        f"- Manifest: `{report['manifest_path']}`",
+        f"- Model: `{report['model_path']}`",
+        f"- Preprocessing mode: `{report['preprocessing_mode']}`",
+        f"- Threshold policy: `{report['threshold_selection']['policy']}`",
+        f"- Selected threshold: `{report['threshold_selection']['threshold']:.6f}`",
+        f"- Calibration: `{report['calibration']['mode']}`",
+        "",
+    ]
+
+    for column_report in report["slice_reports"]:
+        lines.extend(
+            [
+                f"## By `{column_report['column']}`",
+                "",
+                "| Slice | Samples | Accuracy | Balanced Acc. | Precision | Recall | F1 | ROC-AUC | PR-AUC |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for row in column_report["rows"]:
+            thresholded = row["thresholded_metrics"]
+            threshold_free = row["threshold_free_metrics"]
+            lines.append(
+                "| {slice_value} | {num_samples} | {accuracy:.4f} | {balanced_accuracy:.4f} | {precision:.4f} | {recall:.4f} | {f1:.4f} | {roc_auc:.4f} | {pr_auc:.4f} |".format(
+                    slice_value=row["slice_value"],
+                    num_samples=row["num_samples"],
+                    accuracy=thresholded["accuracy"],
+                    balanced_accuracy=thresholded["balanced_accuracy"],
+                    precision=thresholded["precision"],
+                    recall=thresholded["recall"],
+                    f1=thresholded["f1"],
+                    roc_auc=threshold_free["roc_auc"],
+                    pr_auc=threshold_free["pr_auc"],
+                )
+            )
+        lines.append("")
+
+    with open(summary_path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines))
+
+    return metrics_path, summary_path
+
+
+def _compute_metrics_from_outputs(
+    labels: np.ndarray,
+    probabilities: np.ndarray,
+    threshold: float,
+) -> dict[str, Any]:
+    positive_probs = _positive_probabilities(probabilities)
+    thresholded = threshold_metrics(labels, positive_probs, threshold)
+    threshold_free = threshold_free_metrics(labels, positive_probs)
+    reliability = reliability_diagram_binary(labels, positive_probs)
+    brier = brier_score_binary(labels, positive_probs)
+    return {
+        "thresholded_metrics": thresholded,
+        "threshold_free_metrics": threshold_free,
+        "calibration_metrics": {
+            "ece": float(reliability["ece"]),
+            "brier_score": float(brier),
+            "reliability_diagram": reliability["bins"],
+        },
+    }
+
+
+def _fit_tuning_state(
+    model: tf.keras.Model,
+    manifest: pd.DataFrame,
+    split_name: str,
+    preprocess_mode: str,
+    threshold_policy: str,
+    fixed_threshold: float | None,
+    calibrate: str,
+    image_size: tuple[int, int],
+    batch_size: int,
+    dataset_id: str | None = None,
+    domain: str | None = None,
+    tuning_split_preference: list[str] | None = None,
+    tuning_manifest: pd.DataFrame | None = None,
+    tuning_manifest_path: str | None = None,
+    tuning_split_override: str | None = None,
+    forbid_test_tuning: bool = True,
+) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    if str(threshold_policy).lower() == "fixed" and str(calibrate).lower() == "none":
+        if fixed_threshold is None:
+            raise ValueError("A fixed threshold value is required when threshold_policy='fixed'.")
+        threshold_value = float(fixed_threshold)
+        if not 0.0 <= threshold_value <= 1.0:
+            raise ValueError("fixed_threshold must be between 0.0 and 1.0.")
+        return (
+            "none",
+            {"mode": "none", "fitted_on_split": None},
+            {
+                "policy": "fixed",
+                "threshold": threshold_value,
+                "selection_metric": None,
+                "selection_value": None,
+            },
+        )
+
+    tuning_source_manifest = tuning_manifest if tuning_manifest is not None else manifest
+    tuning_source_path = tuning_manifest_path if tuning_manifest_path is not None else "eval_manifest"
+    tuning_eval_reference_split = tuning_split_override or split_name
+
+    if tuning_split_override:
+        tuning_split = tuning_split_override
+        available = set(tuning_source_manifest["split"].astype(str).tolist())
+        if tuning_split not in available:
+            raise ValueError(
+                f"Requested tuning split '{tuning_split}' does not exist in tuning manifest: {tuning_source_path}"
+            )
+    else:
+        tuning_split = select_tuning_split_from_policy(
+            tuning_source_manifest,
+            tuning_split_preference or ["calibration", "val"],
+            tuning_eval_reference_split,
+        )
+    if forbid_test_tuning and split_name in {"test", "real_world"} and tuning_split == split_name:
+        raise ValueError(f"Threshold or calibration tuning on '{split_name}' is forbidden.")
+
+    tuning_frame = _get_split_frame(tuning_source_manifest, tuning_split, dataset_id=dataset_id, domain=domain)
+    tuning_outputs = _extract_logits_and_probabilities(model, tuning_frame, preprocess_mode, image_size, batch_size)
+    tuning_probs = np.asarray(tuning_outputs["probabilities"], dtype=float)
+
+    tuned_probs, calibration_details = _prepare_calibration(
+        calibrate=calibrate,
+        tuning_labels=np.asarray(tuning_outputs["labels"], dtype=int),
+        tuning_logits=None if tuning_outputs["logits"] is None else np.asarray(tuning_outputs["logits"], dtype=float),
+        tuning_probs=tuning_probs,
+    )
+    threshold_selection = select_threshold(
+        np.asarray(tuning_outputs["labels"], dtype=int),
+        _positive_probabilities(tuned_probs),
+        policy=threshold_policy,
+        fixed_threshold=fixed_threshold,
+    )
+    return tuning_split, calibration_details, threshold_selection
+
+
 def run_evaluation(
     model_path: str,
     manifest_path: str,
@@ -261,6 +415,8 @@ def run_evaluation(
     dataset_id: str | None = None,
     domain: str | None = None,
     tuning_split_preference: list[str] | None = None,
+    tuning_manifest_path: str | None = None,
+    tuning_split_override: str | None = None,
     governance_result: dict[str, Any] | None = None,
     forbid_test_tuning: bool = True,
     image_size: tuple[int, int] = (224, 224),
@@ -268,42 +424,35 @@ def run_evaluation(
 ) -> dict[str, Any]:
     """Run research-grade evaluation for a specific manifest split."""
     manifest = _load_manifest(manifest_path)
+    tuning_manifest = _load_manifest(tuning_manifest_path) if tuning_manifest_path else manifest
     label_mapping = load_label_mapping(label_config_path)
     label_mapping_hash = _hash_label_mapping(label_mapping)
 
     if split_name not in set(manifest["split"].astype(str)):
         raise ValueError(f"Requested eval split '{split_name}' does not exist in manifest.")
 
-    tuning_split = select_tuning_split_from_policy(
-        manifest,
-        tuning_split_preference or ["calibration", "val"],
-        split_name,
-    )
-    if forbid_test_tuning and split_name in {"test", "real_world"} and tuning_split == split_name:
-        raise ValueError(f"Threshold or calibration tuning on '{split_name}' is forbidden.")
-
     model = tf.keras.models.load_model(model_path, compile=False)
-
-    tuning_frame = _get_split_frame(manifest, tuning_split, dataset_id=dataset_id, domain=domain)
     eval_frame = _get_split_frame(manifest, split_name, dataset_id=dataset_id, domain=domain)
-
-    tuning_outputs = _extract_logits_and_probabilities(model, tuning_frame, preprocess_mode, image_size, batch_size)
     eval_outputs = _extract_logits_and_probabilities(model, eval_frame, preprocess_mode, image_size, batch_size)
-
-    tuning_probs = np.asarray(tuning_outputs["probabilities"], dtype=float)
     eval_probs = np.asarray(eval_outputs["probabilities"], dtype=float)
-    tuned_probs, calibration_details = _prepare_calibration(
-        calibrate=calibrate,
-        tuning_labels=np.asarray(tuning_outputs["labels"], dtype=int),
-        tuning_logits=None if tuning_outputs["logits"] is None else np.asarray(tuning_outputs["logits"], dtype=float),
-        tuning_probs=tuning_probs,
-    )
 
-    threshold_selection = select_threshold(
-        np.asarray(tuning_outputs["labels"], dtype=int),
-        _positive_probabilities(tuned_probs),
-        policy=threshold_policy,
+    tuning_split, calibration_details, threshold_selection = _fit_tuning_state(
+        model=model,
+        manifest=manifest,
+        split_name=split_name,
+        preprocess_mode=preprocess_mode,
+        threshold_policy=threshold_policy,
         fixed_threshold=fixed_threshold,
+        calibrate=calibrate,
+        image_size=image_size,
+        batch_size=batch_size,
+        dataset_id=dataset_id,
+        domain=domain,
+        tuning_split_preference=tuning_split_preference,
+        tuning_manifest=tuning_manifest,
+        tuning_manifest_path=tuning_manifest_path,
+        tuning_split_override=tuning_split_override,
+        forbid_test_tuning=forbid_test_tuning,
     )
 
     eval_probs = _apply_calibration_to_eval(
@@ -311,19 +460,19 @@ def run_evaluation(
         eval_probs,
         calibration_details,
     )
-    eval_positive_probs = _positive_probabilities(eval_probs)
     eval_labels = np.asarray(eval_outputs["labels"], dtype=int)
-
-    thresholded = threshold_metrics(eval_labels, eval_positive_probs, float(threshold_selection["threshold"]))
-    threshold_free = threshold_free_metrics(eval_labels, eval_positive_probs)
-    reliability = reliability_diagram_binary(eval_labels, eval_positive_probs)
-    brier = brier_score_binary(eval_labels, eval_positive_probs)
+    metrics = _compute_metrics_from_outputs(
+        labels=eval_labels,
+        probabilities=eval_probs,
+        threshold=float(threshold_selection["threshold"]),
+    )
 
     run_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + f"_{split_name}"
     report = {
         "run_id": run_id,
         "split_name": split_name,
         "tuning_split": tuning_split,
+        "tuning_manifest_path": os.path.abspath(tuning_manifest_path) if tuning_manifest_path else os.path.abspath(manifest_path),
         "dataset_version": _get_dataset_version(manifest),
         "manifest_path": os.path.abspath(manifest_path),
         "model_path": os.path.abspath(model_path),
@@ -338,13 +487,9 @@ def run_evaluation(
         "label_mapping_hash": label_mapping_hash,
         "threshold_selection": threshold_selection,
         "calibration": calibration_details,
-        "threshold_free_metrics": threshold_free,
-        "thresholded_metrics": thresholded,
-        "calibration_metrics": {
-            "ece": float(reliability["ece"]),
-            "brier_score": float(brier),
-            "reliability_diagram": reliability["bins"],
-        },
+        "threshold_free_metrics": metrics["threshold_free_metrics"],
+        "thresholded_metrics": metrics["thresholded_metrics"],
+        "calibration_metrics": metrics["calibration_metrics"],
         "metadata": {
             "num_samples": int(len(eval_labels)),
             "used_logit_recovery": bool(eval_outputs["used_logit_recovery"]),
@@ -368,4 +513,116 @@ def run_evaluation(
         "summary_md": os.path.abspath(summary_path),
     }
     metrics_path, summary_path = _write_report_files(report_dir, run_id, report)
+    return report
+
+
+def run_slice_evaluations(
+    model_path: str,
+    manifest_path: str,
+    split_name: str,
+    preprocess_mode: str,
+    label_config_path: str,
+    threshold_policy: str,
+    fixed_threshold: float | None,
+    calibrate: str,
+    report_dir: str,
+    seed: int,
+    tuning_split_preference: list[str] | None = None,
+    forbid_test_tuning: bool = True,
+    image_size: tuple[int, int] = (224, 224),
+    batch_size: int = 32,
+    slice_columns: Sequence[str] = ("domain", "dataset_id"),
+) -> dict[str, Any]:
+    """Evaluate the saved model across slice values using one globally tuned threshold."""
+    manifest = _load_manifest(manifest_path)
+    label_mapping = load_label_mapping(label_config_path)
+    label_mapping_hash = _hash_label_mapping(label_mapping)
+
+    if split_name not in set(manifest["split"].astype(str)):
+        raise ValueError(f"Requested eval split '{split_name}' does not exist in manifest.")
+
+    model = tf.keras.models.load_model(model_path, compile=False)
+    tuning_split, calibration_details, threshold_selection = _fit_tuning_state(
+        model=model,
+        manifest=manifest,
+        split_name=split_name,
+        preprocess_mode=preprocess_mode,
+        threshold_policy=threshold_policy,
+        fixed_threshold=fixed_threshold,
+        calibrate=calibrate,
+        image_size=image_size,
+        batch_size=batch_size,
+        tuning_split_preference=tuning_split_preference,
+        forbid_test_tuning=forbid_test_tuning,
+    )
+
+    full_frame = _get_split_frame(manifest, split_name)
+    slice_reports: list[dict[str, Any]] = []
+    for column in slice_columns:
+        if column not in full_frame.columns:
+            continue
+        values = [
+            value for value in sorted(full_frame[column].dropna().astype(str).unique().tolist())
+            if value.strip()
+        ]
+        if not values:
+            continue
+
+        rows: list[dict[str, Any]] = []
+        for value in values:
+            if column == "domain":
+                slice_frame = _get_split_frame(manifest, split_name, domain=value)
+            elif column == "dataset_id":
+                slice_frame = _get_split_frame(manifest, split_name, dataset_id=value)
+            else:
+                slice_frame = full_frame[full_frame[column].astype(str) == value].copy()
+                if slice_frame.empty:
+                    continue
+
+            outputs = _extract_logits_and_probabilities(model, slice_frame, preprocess_mode, image_size, batch_size)
+            calibrated_probs = _apply_calibration_to_eval(
+                None if outputs["logits"] is None else np.asarray(outputs["logits"], dtype=float),
+                np.asarray(outputs["probabilities"], dtype=float),
+                calibration_details,
+            )
+            labels = np.asarray(outputs["labels"], dtype=int)
+            metrics = _compute_metrics_from_outputs(
+                labels=labels,
+                probabilities=calibrated_probs,
+                threshold=float(threshold_selection["threshold"]),
+            )
+            rows.append(
+                {
+                    "slice_value": value,
+                    "num_samples": int(len(labels)),
+                    "used_logit_recovery": bool(outputs["used_logit_recovery"]),
+                    "thresholded_metrics": metrics["thresholded_metrics"],
+                    "threshold_free_metrics": metrics["threshold_free_metrics"],
+                    "calibration_metrics": metrics["calibration_metrics"],
+                }
+            )
+
+        rows.sort(key=lambda row: row["thresholded_metrics"]["balanced_accuracy"])
+        slice_reports.append({"column": column, "rows": rows})
+
+    run_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ") + f"_{split_name}"
+    report = {
+        "run_id": run_id,
+        "split_name": split_name,
+        "tuning_split": tuning_split,
+        "dataset_version": _get_dataset_version(manifest),
+        "manifest_path": os.path.abspath(manifest_path),
+        "model_path": os.path.abspath(model_path),
+        "seed": int(seed),
+        "preprocessing_mode": preprocess_mode,
+        "label_mapping_hash": label_mapping_hash,
+        "threshold_selection": threshold_selection,
+        "calibration": calibration_details,
+        "slice_reports": slice_reports,
+    }
+    metrics_path, summary_path = _write_slice_report_files(report_dir, run_id, report)
+    report["artifacts"] = {
+        "metrics_json": os.path.abspath(metrics_path),
+        "summary_md": os.path.abspath(summary_path),
+    }
     return report

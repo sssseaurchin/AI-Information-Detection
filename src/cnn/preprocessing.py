@@ -3,7 +3,9 @@ from typing import Callable
 import tensorflow as tf
 import numpy as np
 
-SUPPORTED_PREPROCESS_MODES = {"rgb", "sobel", "rgb+sobel", "dwt"}
+
+SUPPORTED_PREPROCESS_MODES = {"rgb", "sobel", "rgb+sobel", "wavelet", "rgb+wavelet"}
+
 
 def get_default_preprocess_mode() -> str:
     """Read the shared preprocessing mode used by training and inference."""
@@ -134,6 +136,31 @@ def _discrete_wavelet_haar(path, image_size=(224,224)):
     
 #     return dwt
 
+def _normalize_feature_map(features: tf.Tensor) -> tf.Tensor:
+    """Scale feature maps into [0, 1] while remaining stable on flat inputs."""
+    features = tf.cast(features, tf.float32)
+    return features / (tf.reduce_max(features) + 1e-7)
+
+
+def _haar_wavelet_from_rgb(img: tf.Tensor, image_size: tuple[int, int]) -> tf.Tensor:
+    """Compute a simple single-level Haar detail map and return it as 3 channels."""
+    gray = tf.image.rgb_to_grayscale(img)
+
+    top_left = gray[0::2, 0::2, :]
+    top_right = gray[0::2, 1::2, :]
+    bottom_left = gray[1::2, 0::2, :]
+    bottom_right = gray[1::2, 1::2, :]
+
+    horizontal = tf.abs((top_left - top_right + bottom_left - bottom_right) / 4.0)
+    vertical = tf.abs((top_left + top_right - bottom_left - bottom_right) / 4.0)
+    diagonal = tf.abs((top_left - top_right - bottom_left + bottom_right) / 4.0)
+
+    detail = tf.concat([horizontal, vertical, diagonal], axis=-1)
+    detail = _normalize_feature_map(detail)
+    detail = tf.image.resize(detail, image_size, method="bilinear", antialias=False)
+    return detail
+
+
 def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: str = "rgb") -> tuple[tf.Tensor, int]:
     """Apply the repository's shared preprocessing pipeline for a chosen mode."""
     normalized_mode = mode.strip().lower()
@@ -145,22 +172,23 @@ def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: s
         rgb = _decode_rgb_image(path, image_size)
         return rgb, label
 
+    if normalized_mode in {"sobel", "rgb+sobel"}:
+        sobel = _sobel_from_rgb(rgb, image_size)
     if normalized_mode == "sobel":
         rgb = _decode_rgb_image(path, image_size)
         sobel = _sobel_from_rgb(rgb, image_size)
         return sobel, label
-    
     if normalized_mode == "rgb+sobel":
-        rgb = _decode_rgb_image(path, image_size)
-        sobel = _sobel_from_rgb(rgb, image_size)
-        return tf.clip_by_value((rgb + sobel) / 2.0, 0.0, 1.0), label
-    
-    if normalized_mode == "dwt":
-        dwt = _discrete_wavelet_haar(path, image_size)
-        return dwt, label
+        combined = tf.clip_by_value((rgb + sobel) / 2.0, 0.0, 1.0)
+        return combined, label
 
-    else:
-        raise ValueError(f"Unsupported preprocessing mode: {mode}")
+    wavelet = _haar_wavelet_from_rgb(rgb, image_size)
+    if normalized_mode == "wavelet":
+        return wavelet, label
+
+    combined = tf.clip_by_value((rgb + wavelet) / 2.0, 0.0, 1.0)
+    return combined, label
+
 
 def get_preprocess_fn(mode: str | None = None) -> Callable[[str, int, tuple[int, int]], tuple[tf.Tensor, int]]:
     """Build a preprocessing callable with a frozen mode for tf.data mapping."""

@@ -7,10 +7,10 @@ services:
         BASE_IMAGE: tensorflow/tensorflow:2.19.0
     image: aid:local
     working_dir: /app
-    command: python3 -m main
+    command: python3 -m src.cnn.main
     environment:
       PYTHONPATH: /app/src/cnn
-      DATASET_PATH: /app/Dataset
+      DATASET_PATH: /app/Dataset/prepared/combined_train
     volumes:
       - .:/app
     ports:
@@ -24,10 +24,10 @@ services:
         BASE_IMAGE: tensorflow/tensorflow:2.19.0-gpu
     image: aid:local-gpu
     working_dir: /app
-    command: python3 -m main
+    command: python3 -m src.cnn.main
     environment:
       PYTHONPATH: /app/src/cnn
-      DATASET_PATH: /app/Dataset
+      DATASET_PATH: /app/Dataset/prepared/combined_train
     volumes:
       - .:/app
     ports:
@@ -35,4 +35,39 @@ services:
     # Requires Docker Desktop GPU support or Docker Engine with NVIDIA Container Toolkit.
     profiles:
       - gpu
+    gpus: all
+
+  aid-benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: tensorflow/tensorflow:2.15.0
+    image: aid:local-benchmark
+    working_dir: /app
+    command: python3 src/cnn/run_benchmark_matrix.py
+    environment:
+      PYTHONPATH: /app/src/cnn
+      DATASET_PATH: /app/Dataset/prepared/combined_train
+    volumes:
+      - .:/app
+    profiles:
+      - benchmark
+
+  aid-benchmark-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: tensorflow/tensorflow:2.15.0-gpu
+    image: aid:local-benchmark-gpu
+    working_dir: /app
+    command: python3 src/cnn/run_benchmark_matrix.py
+    environment:
+      PYTHONPATH: /app/src/cnn
+      DATASET_PATH: /app/Dataset/prepared/combined_train
+    volumes:
+      - .:/app
+    profiles:
+      - benchmark-gpu
     gpus: all

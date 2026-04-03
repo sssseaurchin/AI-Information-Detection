@@ -219,7 +219,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split", default="val", help="Manifest split to evaluate.")
     parser.add_argument("--dataset-id", default=None, help="Optional dataset_id subset filter.")
     parser.add_argument("--domain", default=None, help="Optional domain subset filter.")
-    parser.add_argument("--preprocess-mode", default=get_default_preprocess_mode(), choices=["rgb", "sobel", "rgb+sobel"])
+    parser.add_argument("--preprocess-mode", default=get_default_preprocess_mode(), choices=["rgb", "sobel", "rgb+sobel", "wavelet", "rgb+wavelet"])
     parser.add_argument("--image-size", type=int, default=224, help="Square image size used for preprocessing and corruptions.")
     parser.add_argument("--report-dir", default="/app/reports", help="Directory for JSON and markdown outputs.")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size for inference.")

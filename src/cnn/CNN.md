@@ -1,134 +1,84 @@
-# AI-Information-Detection – Docker GPU Workflow Guide
+# CNN Pipeline
 
-This document provides a complete explanation of how to run, build, and operate the AI-Information-Detection project using Docker on both CPU and GPU.
+This directory contains the active real-vs-synthetic image detection workflow.
 
-## 1) Project Structure
-```
-AI-Information-Detection/
-│   docker-compose.yml
-│
-└── src/
-    ├── dockerfile
-    ├── requirements.txt
-    ├── main.py
-    └── other .py files
-```
+## Main Files
 
-## 2) Environment Overview
-All environments run fully inside Docker. No local TensorFlow, CUDA, or Python setup is required.
+- `main.py`: training and evaluation CLI
+- `cnnModel.py`: model definitions and training loop
+- `preprocessing.py`: shared preprocessing modes
+- `eval_runner.py`: evaluation reports and calibration-aware metrics
+- `corruption_eval.py`: corruption robustness evaluation
+- `split_utils.py`: manifest loading and split generation
 
-## 3) CPU Development Mode (Fast Testing)
-```
-cd C:\Users\okkah\Python\AI-Information-Detection
+## Supported Architectures
 
-docker compose run --rm aid-dev
-```
-Stops with CTRL+C or:
-```
-docker ps
-docker kill <id>
-```
+- `simple`
+- `dual_artifact_cnn`
+- `efficientnet_b0`
+- `efficientnet_v2b0`
+- `resnet50`
+- `convnext_tiny`
+- `clip_vit_b32`
 
-## 4) GPU Mode (Main Workflow)
-### GPU Debug Shell
-```
-docker run --gpus all --rm -it ai-information-detection:dev bash
-```
-Inside:
-```
-python3 -m main
-```
-GPU test:
-```
-python3 - <<EOF
-import tensorflow as tf
-print(tf.config.list_physical_devices('GPU'))
-EOF
-```
-Exit:
-```
-exit
-```
+## Supported Preprocessing Modes
 
-## 5) GPU Direct Run (non-interactive)
-```
-docker run --gpus all --rm ai-information-detection:dev
-```
-Runs `python3 -m main` automatically.
+- `rgb`
+- `sobel`
+- `rgb+sobel`
+- `wavelet`
+- `rgb+wavelet`
 
-## 6) GPU Dockerfile
-```
-FROM tensorflow/tensorflow:2.15.0-gpu
-WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["python3", "-m", "main"]
-```
-Includes TensorFlow GPU, CUDA, cuDNN.
+Notes:
 
-## 7) Requirements
-```
-pandas==2.3.3
-numpy==1.26.4
-```
-TensorFlow is already in the GPU base image.
+- `clip_vit_b32` should be used with `rgb`
+- `dual_artifact_cnn` should also be used with `rgb` because it builds artifact branches internally
 
-## 8) Building Images
-Normal build:
-```
-docker compose build aid-dev
-```
-Clean rebuild:
-```
-docker compose build --no-cache aid-dev
+## Current Features
+
+- deterministic manifest-based train/val splits
+- `dataset_id` and `domain` metadata
+- domain-aware augmentation
+- staged fine-tuning for transfer backbones
+- post-run slice reports
+- multi-run benchmark tooling
+- duplicate and near-duplicate audit tooling
+- corrupt and oversized image hygiene tooling
+
+## Common Commands
+
+Train:
+
+```bash
+python -m src.cnn.main
 ```
 
-## 9) Stopping Containers
-CPU mode:
-```
-CTRL + C
-```
-If stuck:
-```
-docker ps
-docker kill <id>
-```
-GPU shell:
-```
-exit
-```
-GPU direct run freeze:
-```
-docker ps
-docker kill <id>
+Eval:
+
+```bash
+python -m src.cnn.main --eval-only
 ```
 
-## 10) Quick Summary
-CPU:
+Benchmark matrix:
+
+```bash
+python -m src.cnn.run_benchmark_matrix --project-root /app --manifest-paths /app/Dataset/prepared/combined_train/split_manifest.csv --output-dir /app/reports/benchmark_matrix
 ```
-docker compose run --rm aid-dev
+
+Duplicate audit:
+
+```bash
+python -m src.cnn.audit_duplicates --manifest-path /app/Dataset/prepared/combined_train/split_manifest.csv --output-dir /app/reports/duplicate_audit
 ```
-GPU:
+
+Corrupt scan:
+
+```bash
+python -m src.cnn.clean_corrupt_images --dataset-path /app/Dataset/prepared/combined_train --report-only
 ```
-docker run --gpus all --rm ai-information-detection:dev
-```
-GPU Debug:
-```
-docker run --gpus all --rm -it ai-information-detection:dev bash
-```
-Stop:
-```
-exit
-```
-Or:
-```
-CTRL + C
-```
-Or:
-```
-docker kill <id>
+
+Fix exact duplicate split leakage:
+
+```bash
+python -m src.cnn.fix_exact_duplicate_split_leakage --manifest-path /app/Dataset/prepared/combined_train/split_manifest.csv --exact-duplicates-path /app/reports/duplicate_audit/exact_duplicates.csv --backup
 ```
