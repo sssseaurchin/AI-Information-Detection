@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BASE_IMAGE: tensorflow/tensorflow:2.15.0
+        BASE_IMAGE: tensorflow/tensorflow:2.19.0
     image: aid:local
     working_dir: /app
     command: python3 -m src.cnn.main
@@ -21,7 +21,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BASE_IMAGE: tensorflow/tensorflow:2.15.0-gpu
+        BASE_IMAGE: tensorflow/tensorflow:2.19.0-gpu
     image: aid:local-gpu
     working_dir: /app
     command: python3 -m src.cnn.main

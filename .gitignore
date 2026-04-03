@@ -1,10 +1,12 @@
 ### Project Specific ###
 dataset
 src/cnn/model
-
+test.py
+*.h5
 *.jpeg
 *.png
 
+uploaded_images/
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/

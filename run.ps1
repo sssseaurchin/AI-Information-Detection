@@ -1,5 +1,5 @@
 param(
-    [string]$Action = "train"
+    [string]$Action = "test"
 )
 
 switch ($Action) {
@@ -23,6 +23,9 @@ switch ($Action) {
     }
     "clean" {
         docker compose down -v
+    }
+    "test" {
+        docker compose run --rm aid python -m src.cnn.test
     }
     default {
         Write-Host "Unknown action. Use: build | train | eval | eval-manifest | eval-report | shell | clean"
