@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=tensorflow/tensorflow:2.15.0
+ARG BASE_IMAGE=tensorflow/tensorflow:2.20.0
 FROM ${BASE_IMAGE}
 
 WORKDIR /app
@@ -14,4 +14,4 @@ RUN pip install --upgrade pip && \
 
 COPY . /app
 
-CMD ["python3", "-m", "main"]
+CMD ["python3", "-m", "src.cnn.main"]

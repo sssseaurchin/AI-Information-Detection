@@ -64,6 +64,11 @@ def select_tuning_split_from_policy(manifest: pd.DataFrame, tuning_split_prefere
     raise ValueError("No governance-approved tuning split is available in the manifest.")
 
 
+def requires_tuning_split(threshold_policy: str, calibrate_mode: str) -> bool:
+    """Return whether evaluation needs a separate tuning/calibration split."""
+    return not (str(threshold_policy).lower() == "fixed" and str(calibrate_mode).lower() == "none")
+
+
 def _read_access_log(log_path: str) -> list[dict[str, Any]]:
     if not os.path.exists(log_path):
         return []

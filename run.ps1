@@ -1,5 +1,5 @@
 param(
-    [string]$Action = "train"
+    [string]$Action = "test"
 )
 
 switch ($Action) {
@@ -13,7 +13,7 @@ switch ($Action) {
         docker compose run --rm aid python -m src.cnn.main --eval-only
     }
     "eval-manifest" {
-        docker compose run --rm aid python -m src.cnn.main --eval-only --split-manifest /app/src/cnn/splits/split_manifest.csv
+        docker compose run --rm aid python -m src.cnn.main --eval-only --split-manifest /app/Dataset/prepared/combined_train/split_manifest.csv
     }
     "eval-report" {
         docker compose run --rm aid python -m src.cnn.main --eval-only --report-dir /app/reports
@@ -23,6 +23,9 @@ switch ($Action) {
     }
     "clean" {
         docker compose down -v
+    }
+    "test" {
+        docker compose run --rm aid python -m src.cnn.test
     }
     default {
         Write-Host "Unknown action. Use: build | train | eval | eval-manifest | eval-report | shell | clean"

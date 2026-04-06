@@ -6,5 +6,11 @@
 */HC3_HUMAN_GPT
 */LLM_User_Text
 
-/data
+*/data
 *.h5
+
+hf_cache/
+__pycache__/
+*.lock
+
+glove.6B.100d.txt

@@ -5,10 +5,11 @@ import uuid
 from pathlib import Path
 
 
-UPLOAD_DIR = Path("data/uploads")
+UPLOAD_DIR = Path("uploaded_images")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_BYTES = 10 * 1024 * 1024 
+MAX_BYTES = 10 * 1024 * 1024
 ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+
 
 def save_image_from_base64(base64_str: str, ext: str = ".png") -> Path:
     if not isinstance(base64_str, str) or not base64_str.strip():
@@ -29,7 +30,7 @@ def save_image_from_base64(base64_str: str, ext: str = ".png") -> Path:
             raise ValueError("Invalid data URL format")
 
     try:
-        data = base64.b64decode(s, validate=True)
+        data = base64.b64decode(s, validate=True)  # image from b64
     except (binascii.Error, ValueError):
         raise ValueError("Invalid base64 payload")
 
@@ -40,7 +41,7 @@ def save_image_from_base64(base64_str: str, ext: str = ".png") -> Path:
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    filename = f"{uuid.uuid4().hex}{ext}"
+    filename = f"{uuid.uuid4().hex}{ext}"  # generate unique filename on run
     path = UPLOAD_DIR / filename
 
     # Atomic write
