@@ -42,7 +42,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BASE_IMAGE: tensorflow/tensorflow:2.15.0
+        BASE_IMAGE: tensorflow/tensorflow:2.19.0
     image: aid:local-benchmark
     working_dir: /app
     command: python3 src/cnn/run_benchmark_matrix.py
@@ -59,7 +59,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BASE_IMAGE: tensorflow/tensorflow:2.15.0-gpu
+        BASE_IMAGE: tensorflow/tensorflow:2.19.0-gpu
     image: aid:local-benchmark-gpu
     working_dir: /app
     command: python3 src/cnn/run_benchmark_matrix.py

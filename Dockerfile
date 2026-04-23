@@ -1,4 +1,5 @@
-ARG BASE_IMAGE=tensorflow/tensorflow:2.20.0
+# syntax = docker/dockerfile:experimental 
+ARG BASE_IMAGE=tensorflow/tensorflow:2.19.0
 FROM ${BASE_IMAGE}
 
 WORKDIR /app

@@ -1,6 +1,9 @@
+import os
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+
+
 from cnnModel import train_model, predict_image
 from CSVCreator import create_csv
-import os
 import argparse
 from label_config import get_default_label_config_path, load_label_mapping
 from preprocessing import get_default_preprocess_mode
