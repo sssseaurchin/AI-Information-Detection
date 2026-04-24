@@ -28,9 +28,22 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 
     if (info.menuItemId === "analyze-image") {
         endpoint = "/analyze_image";
-        const base64 = await fetchAndCompress(info.srcUrl);
+
+        const results = await browser.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: getImageData,
+            args: [info.srcUrl]
+        });
+
+        const base64 = results[0].result;
+
+        if (!base64) {
+            console.error("Could not retrieve image data from page.");
+            return;
+        }
+
         payload.image = base64;
-        previewData = {type: 'image', content: info.srcUrl};
+        previewData = { type: 'image', content: info.srcUrl };
     } else if (info.menuItemId === "analyze-text") {
         endpoint = "/analyze_text";
         payload.text = info.selectionText;
@@ -134,4 +147,26 @@ async function addToHistory(input, result) {
         history: updatedHistory,
         lastResult: result
     });
+}
+
+function getImageData(targetUrl) {
+    const img = document.querySelector(`img[src="${targetUrl}"]`);
+    if (!img) return null;
+
+    try {
+        const canvas = document.createElement("canvas");
+        // Use naturalWidth to get the original size, not the CSS size
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+
+        // Convert to Base64 (JPEG at 80% quality to keep payload small)
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        return dataUrl.split(',')[1];
+    } catch (e) {
+        console.error("Canvas grab failed (likely strict CSP):", e);
+        return null;
+    }
 }
