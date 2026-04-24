@@ -6,7 +6,7 @@ async function setupMenus() {
     browser.contextMenus.create({
         id: "analyze-image",
         title: "Analyze image with AID",
-        contexts: ["image"]
+        contexts: ["all"]
     });
 
     browser.contextMenus.create({
@@ -29,30 +29,45 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === "analyze-image") {
         endpoint = "/analyze_image";
 
-        const results = await browser.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: getImageData,
-            args: [info.srcUrl]
-        });
+        let targetUrl = info.srcUrl;
 
-        const base64 = results[0].result;
+        try {
+            const response = await browser.tabs.sendMessage(tab.id, {
+                action: "GET_IMAGE_DATA"
+            });
+
+            if (response && response.url) {
+                targetUrl = response.url;
+            }
+        } catch (e) {
+            console.error("Content script not responding, using default URL.");
+        }
+
+        if (!targetUrl) {
+            console.error("Could not find an image URL.");
+            return;
+        }
+
+        const base64 = await fetchAndCompress(targetUrl);
 
         if (!base64) {
-            console.error("Could not retrieve image data from page.");
+            console.error("Base64 conversion failed.");
             return;
         }
 
         payload.image = base64;
-        previewData = { type: 'image', content: info.srcUrl };
+        previewData = { type: 'image', content: targetUrl };
+
     } else if (info.menuItemId === "analyze-text") {
         endpoint = "/analyze_text";
         payload.text = info.selectionText;
-        previewData = {type: 'text', content: info.selectionText};
+        previewData = { type: 'text', content: info.selectionText };
     }
 
-    await browser.storage.local.set({lastInput: previewData});
-
-    performBackgroundAnalysis(endpoint, payload);
+    if (endpoint) {
+        await browser.storage.local.set({ lastInput: previewData });
+        performBackgroundAnalysis(endpoint, payload);
+    }
 });
 
 async function fetchAndCompress(url) {
@@ -155,15 +170,13 @@ function getImageData(targetUrl) {
 
     try {
         const canvas = document.createElement("canvas");
-        // Use naturalWidth to get the original size, not the CSS size
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
 
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0);
 
-        // Convert to Base64 (JPEG at 80% quality to keep payload small)
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
         return dataUrl.split(',')[1];
     } catch (e) {
         console.error("Canvas grab failed (likely strict CSP):", e);
