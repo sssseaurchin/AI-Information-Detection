@@ -113,26 +113,26 @@ def frequency_high(path: str) -> tf.Tensor:
     return high_freq
 
 # TODO fix math
-def radial_spectrum(path: str) -> tf.Tensor:
-    # Computes the radial spectrum by averaging the FFT spectrum values in concentric circles around the center of the spectrum.
-    spec = fft_spectrum(path)
-    h, w, d = spec.shape
-    cy, cx = h//2, w//2
+# def radial_spectrum(path: str) -> tf.Tensor:
+#     # Computes the radial spectrum by averaging the FFT spectrum values in concentric circles around the center of the spectrum.
+#     spec = fft_spectrum(path)
+#     h, w, d = spec.shape
+#     cy, cx = h//2, w//2
 
-    y = tf.range(h)
-    x = tf.range(w)
+#     y = tf.range(h)
+#     x = tf.range(w)
 
-    Y, X = tf.meshgrid(y, x, indexing="ij")
+#     Y, X = tf.meshgrid(y, x, indexing="ij")
 
-    r = tf.sqrt((X-cx)**2 + (Y-cy)**2)
-    r = tf.cast(r, tf.int32)
-    max_r = tf.reduce_max(r)
+#     r = tf.sqrt((X-cx)**2 + (Y-cy)**2)
+#     r = tf.cast(r, tf.int32)
+#     max_r = tf.reduce_max(r)
 
-    spectrum = []
+#     spectrum = []
 
-    for i in range(max_r):
-        mask = tf.where(r == i)
-        values = tf.gather_nd(spec, mask)
-        spectrum.append(tf.reduce_mean(values))
+#     for i in range(max_r):
+#         mask = tf.where(r == i)
+#         values = tf.gather_nd(spec, mask)
+#         spectrum.append(tf.reduce_mean(values))
 
-    return tf.stack(spectrum)
+#     return tf.stack(spectrum)
