@@ -1,6 +1,4 @@
 import os
-os.environ["TF_USE_LEGACY_KERAS"] = "1"
-
 
 from cnnModel import train_model, predict_image
 from CSVCreator import create_csv
