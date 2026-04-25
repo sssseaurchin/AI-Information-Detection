@@ -164,7 +164,7 @@ def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: s
         combined = tf.clip_by_value((rgb + wavelet) / 2.0, 0.0, 1.0)
         return combined, label
     
-    return None, label  # Fallback case, should never reach here due to earlier check
+    return None, label  # type: ignore # Fallback case, should never reach here due to earlier check
 
 
 def get_preprocess_fn(mode: str | None = None) -> Callable[[str, int, tuple[int, int]], tuple[tf.Tensor, int]]:
