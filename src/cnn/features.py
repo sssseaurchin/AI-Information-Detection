@@ -1,7 +1,7 @@
 import tensorflow as tf
 from typing import Optional
 from skimage.feature import graycomatrix
-from features_tools import image_read, fft_spectrum, rgb_to_grayscale_gpu
+from features_tools import image_read, fft_spectrum
 
 # ----------------------------SPATIAL FEATURES----------------------------
 
@@ -51,7 +51,7 @@ def gray_comatrix(path: str, num_levels: int = 8, image_size: Optional[tuple[int
     if image_size is not None:
         img = tf.image.resize(img, image_size)
 
-    gray = tf.image.rgb_to_grayscale_gpu(img)
+    gray = tf.image.rgb_to_grayscale(img)
     gray = tf.cast(gray, tf.int32)
     gray = gray // tf.constant(256 // num_levels, dtype=tf.int32) # Normalize to [0, num_levels - 1]
     
@@ -81,7 +81,7 @@ def noise_residual(path: str) -> tf.Tensor:
 
 def frequency_log_spectrum(path: str, size: tuple[int, int] = (224, 224)) -> tf.Tensor:
     img = image_read(path)
-    img = tf.image.rgb_to_grayscale_gpu(img)
+    img = tf.image.rgb_to_grayscale(img)
     img = tf.image.resize(img, size)
     fft = tf.signal.fft2d(tf.cast(img, tf.complex64))
     magnitude = tf.abs(fft)

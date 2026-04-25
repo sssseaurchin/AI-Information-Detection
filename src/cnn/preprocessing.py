@@ -2,8 +2,7 @@ import os
 from typing import Callable
 import tensorflow as tf
 import numpy as np
-from features_tools import dwt_haar_tf
-from features_tools import rgb_to_grayscale_gpu
+from features_tools import dwt_haar_coeffs
 
 
 SUPPORTED_PREPROCESS_MODES = {"rgb", "sobel", "rgb+sobel", "wavelet", "rgb+wavelet"}
@@ -48,9 +47,9 @@ def _sobel_from_rgb(path: str, image_size: tuple[int, int]) -> tf.Tensor:
 def _discrete_wavelet_haar(path, image_size=(224,224)) -> tf.Tensor:
     """Convert an RGB image into a normalized 3-channel discrete wavelet transform detail map."""
     img = _decode_rgb_image(path, image_size)
-    img = tf.image.rgb_to_grayscale_gpu(img)
+    img = tf.image.rgb_to_grayscale(img)
 
-    coeffs = dwt_haar_tf(img)
+    coeffs = dwt_haar_coeffs(img)
 
     # LL = coeffs[:, :, 0]
     LH = coeffs[:, :, 1]

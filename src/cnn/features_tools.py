@@ -9,19 +9,19 @@ def image_read(path: str) -> tf.Tensor:
     
     return img
 
-def rgb_to_grayscale_gpu(images):
-    images = tf.cast(images, tf.float32)
+# def rgb_to_grayscale_gpu(images):
+#     images = tf.cast(images, tf.float32)
 
-    kernel = tf.constant(
-        [[[[0.2989]], [[0.5870]], [[0.1140]]]],
-        dtype=images.dtype
-    )  # shape: [1, 1, 3, 1]
+#     kernel = tf.constant(
+#         [[[[0.2989]], [[0.5870]], [[0.1140]]]],
+#         dtype=images.dtype
+#     )  # shape: [1, 1, 3, 1]
 
-    return tf.nn.conv2d(images, kernel, strides=1, padding="SAME")
+#     return tf.nn.conv2d(images, kernel, strides=1, padding="SAME")
 
 def fft_spectrum(path: str) -> tf.Tensor:
     img = image_read(path)
-    img = tf.image.rgb_to_grayscale_gpu(img)
+    img = tf.image.rgb_to_grayscale(img)
     fft = tf.signal.fft2d(tf.cast(img, tf.complex64))
     magnitude = tf.abs(fft)
     log_spectrum = tf.math.log(magnitude + 1e-8)
@@ -47,7 +47,7 @@ def haar_filters():
 
     return tf.constant(filters, dtype=tf.float32)
 
-def dwt_haar_tf(image):
+def dwt_haar_coeffs(image):
     """
     image: (H, W, 1)
     returns: (H/2, W/2, 4)
