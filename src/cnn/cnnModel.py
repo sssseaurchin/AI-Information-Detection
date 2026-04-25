@@ -573,7 +573,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     train_dataset = train_dataset.filter(lambda img, label, domain: tf.shape(img)[0] == image_size[0])
     
     # Ignore errors for corrupt images - skip them instead of crashing
-    train_dataset = train_dataset.ignore_errors()
+    train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
     
     # Apply data augmentation if enabled (only for training)
     if enable_augmentation:
@@ -625,7 +625,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     val_dataset = val_dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
 
     # Ignore errors for corrupt images
-    val_dataset = val_dataset.ignore_errors()
+    val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
 
     val_dataset = val_dataset.map(
         lambda img, label: _apply_arch_preprocessing(img, label, arch),
