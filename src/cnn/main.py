@@ -1,4 +1,4 @@
-from cnnModel import train_model, predict_image
+from cnnModel import train_model
 from CSVCreator import create_csv
 import os
 import argparse
