@@ -9,9 +9,19 @@ def image_read(path: str) -> tf.Tensor:
     
     return img
 
+def rgb_to_grayscale_gpu(images):
+    images = tf.cast(images, tf.float32)
+
+    kernel = tf.constant(
+        [[[[0.2989]], [[0.5870]], [[0.1140]]]],
+        dtype=images.dtype
+    )  # shape: [1, 1, 3, 1]
+
+    return tf.nn.conv2d(images, kernel, strides=1, padding="SAME")
+
 def fft_spectrum(path: str) -> tf.Tensor:
     img = image_read(path)
-    img = tf.image.rgb_to_grayscale(img)
+    img = tf.image.rgb_to_grayscale_gpu(img)
     fft = tf.signal.fft2d(tf.cast(img, tf.complex64))
     magnitude = tf.abs(fft)
     log_spectrum = tf.math.log(magnitude + 1e-8)

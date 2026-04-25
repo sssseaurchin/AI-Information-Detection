@@ -3,6 +3,7 @@ from typing import Callable
 import tensorflow as tf
 import numpy as np
 from features_tools import dwt_haar_tf
+from features_tools import rgb_to_grayscale_gpu
 
 
 SUPPORTED_PREPROCESS_MODES = {"rgb", "sobel", "rgb+sobel", "wavelet", "rgb+wavelet"}
@@ -47,7 +48,7 @@ def _sobel_from_rgb(path: str, image_size: tuple[int, int]) -> tf.Tensor:
 def _discrete_wavelet_haar(path, image_size=(224,224)) -> tf.Tensor:
     """Convert an RGB image into a normalized 3-channel discrete wavelet transform detail map."""
     img = _decode_rgb_image(path, image_size)
-    img = tf.image.rgb_to_grayscale(img)
+    img = tf.image.rgb_to_grayscale_gpu(img)
 
     coeffs = dwt_haar_tf(img)
 
@@ -108,37 +109,37 @@ def _discrete_wavelet_haar(path, image_size=(224,224)) -> tf.Tensor:
     
 #     return dwt
 
-def _normalize_feature_map(features: tf.Tensor) -> tf.Tensor:
-    """Scale feature maps into [0, 1] while remaining stable on flat inputs."""
-    features = tf.cast(features, tf.float32)
-    return features / (tf.reduce_max(features) + 1e-7)
+# def _normalize_feature_map(features: tf.Tensor) -> tf.Tensor:
+#     """Scale feature maps into [0, 1] while remaining stable on flat inputs."""
+#     features = tf.cast(features, tf.float32)
+#     return features / (tf.reduce_max(features) + 1e-7)
 
 
-def _haar_wavelet_from_rgb(img: tf.Tensor, image_size: tuple[int, int]) -> tf.Tensor:
-    """Compute a simple single-level Haar detail map and return it as 3 channels."""
-    gray = tf.image.rgb_to_grayscale(img)
+# def _haar_wavelet_from_rgb(img: tf.Tensor, image_size: tuple[int, int]) -> tf.Tensor:
+#     """Compute a simple single-level Haar detail map and return it as 3 channels."""
+#     gray = tf.image.rgb_to_grayscale_gpu(img)
 
-    top_left = gray[0::2, 0::2, :]
-    top_right = gray[0::2, 1::2, :]
-    bottom_left = gray[1::2, 0::2, :]
-    bottom_right = gray[1::2, 1::2, :]
+#     top_left = gray[0::2, 0::2, :]
+#     top_right = gray[0::2, 1::2, :]
+#     bottom_left = gray[1::2, 0::2, :]
+#     bottom_right = gray[1::2, 1::2, :]
 
-    horizontal = tf.abs((top_left - top_right + bottom_left - bottom_right) / 4.0)
-    vertical = tf.abs((top_left + top_right - bottom_left - bottom_right) / 4.0)
-    diagonal = tf.abs((top_left - top_right - bottom_left + bottom_right) / 4.0)
+#     horizontal = tf.abs((top_left - top_right + bottom_left - bottom_right) / 4.0)
+#     vertical = tf.abs((top_left + top_right - bottom_left - bottom_right) / 4.0)
+#     diagonal = tf.abs((top_left - top_right - bottom_left + bottom_right) / 4.0)
 
-    detail = tf.concat([horizontal, vertical, diagonal], axis=-1)
-    detail = _normalize_feature_map(detail)
-    detail = tf.image.resize(detail, image_size, method="bilinear", antialias=False)
-    return detail
+#     detail = tf.concat([horizontal, vertical, diagonal], axis=-1)
+#     detail = _normalize_feature_map(detail)
+#     detail = tf.image.resize(detail, image_size, method="bilinear", antialias=False)
+#     return detail
 
 
-def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: str = "rgb") -> tuple[tf.Tensor, int]:
+def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: str = "rgb") -> tuple[tf.Tensor, int] :
     """Apply the repository's shared preprocessing pipeline for a chosen mode."""
     normalized_mode = mode.strip().lower()
+    
     if normalized_mode not in SUPPORTED_PREPROCESS_MODES:
         raise ValueError(f"Unsupported preprocessing mode: {mode}")
-
     
     if normalized_mode == "rgb":
         rgb = _decode_rgb_image(path, image_size)
@@ -153,7 +154,7 @@ def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: s
         sobel = _sobel_from_rgb(path, image_size)
         combined = tf.clip_by_value((rgb + sobel) / 2.0, 0.0, 1.0)
         return combined, label
-
+    
     if normalized_mode == "wavelet":
         wavelet = _discrete_wavelet_haar(path, image_size)
         return wavelet, label
@@ -164,7 +165,7 @@ def preprocess_image(path: str, label: int, image_size: tuple[int, int], mode: s
         combined = tf.clip_by_value((rgb + wavelet) / 2.0, 0.0, 1.0)
         return combined, label
     
-    return None, label  # type: ignore # Fallback case, should not be reached due to earlier check
+    return None, label  # Fallback case, should never reach here due to earlier check
 
 
 def get_preprocess_fn(mode: str | None = None) -> Callable[[str, int, tuple[int, int]], tuple[tf.Tensor, int]]:
