@@ -60,7 +60,8 @@ def cnn_analyze_image(image_path, model_name=DEF_MODEL_NAME):
         model = load_model(MODEL_PATH, compile=False)  # LOAD MODEL
     except Exception as e:
         logging.error(f"Error loading model: {e} AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-        raise
+        logging.error(f"error mesajı: {str(e)}")
+        raise e
     logging.info(f"stringified image_path: {str(image_path)}")
     logging.info(f"Model {model_name} loaded successfully. Starting analysis...")
     score = _predict_image(
