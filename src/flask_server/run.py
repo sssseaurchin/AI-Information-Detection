@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import logging
 
 # Add parent directory to path for direct execution support
 if __package__:
@@ -38,29 +39,50 @@ def ping_text_side():
 # ANALYZE IMAGE !!
 @app.post("/analyze_image")
 def analyze_image():
+    logging.info("Received request for /analyze_image endpoint")
+
     payload = request.get_json(silent=True) or {}
+    logging.debug(f"Raw payload keys: {list(payload.keys())}")
 
-    # Support your current frontend key too
+    # Support multiple frontend keys
     b64 = payload.get("image") or payload.get("image_base64") or payload.get("base64") or payload.get("b64")
+    model_preferred = payload.get("model")
+    extension = payload.get("ext", "jpg")
 
-    payload = request.get_json() or {}
-    b64 = payload.get("image_base64") or payload.get("base64") or payload.get("b64")
-    model_preffered = payload.get("model")
+    if not b64:
+        logging.warning("No base64 image data found in request payload")
+        return jsonify({"error": "Missing image data"}), 400
 
-    extension = payload.get("ext", "jpg")  # !!!!
+    logging.info(f"Image extension: {extension}")
+    logging.info(f"Model requested: {model_preferred if model_preferred else 'default'}")
 
+    # Save image
     try:
         image_path = save_image_from_base64(base64_str=b64, ext=extension)
-        print(f"Image saved at: {image_path}")
+        logging.info(f"Image successfully saved at: {image_path}")
     except Exception as e:
+        logging.error(f"Failed to save image: {e}", exc_info=True)
         return jsonify({"error": f"Failed on saving image! {e}"}), 400
 
-    if model_preffered:
-        confidence = cnn_analyze_image(image_path, model_name=model_preffered)
-    else:
-        confidence = cnn_analyze_image(image_path)
-    # return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
-    return jsonify({"confidence": confidence, "details": {"model_used": model_preffered if model_preffered else "default_model_set"}})
+    # Run inference
+    try:
+        if model_preferred:
+            logging.info(f"Running inference with model: {model_preferred}")
+            confidence = cnn_analyze_image(image_path, model_name=model_preferred)
+        else:
+            logging.info("Running inference with default model")
+            confidence = cnn_analyze_image(image_path)
+
+        logging.info(f"Inference completed. Confidence: {confidence}")
+
+    except Exception as e:
+        logging.error(f"Inference failed: {e}", exc_info=True)
+        return jsonify({"error": f"Inference failed: {e}"}), 500
+
+    response = {"confidence": confidence, "details": {"model_used": model_preferred if model_preferred else "default_model_set"}}
+
+    logging.debug(f"Response payload: {response}")
+    return jsonify(response)
 
 
 # ANALYZE TEXT !!
