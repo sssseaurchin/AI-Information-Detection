@@ -55,9 +55,14 @@ def _predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (
 
 def cnn_analyze_image(image_path, model_name=DEF_MODEL_NAME):
     MODEL_PATH = MODELS_FOLDER / model_name
-
-    model = load_model(MODEL_PATH, compile=False)  # LOAD MODEL
+    logging.info(f"Loading CNN model froms: {MODEL_PATH}")
+    try:
+        model = load_model(MODEL_PATH, compile=False)  # LOAD MODEL
+    except Exception as e:
+        logging.error(f"Error loading model: {e} AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        raise
     logging.info(f"stringified image_path: {str(image_path)}")
+    logging.info(f"Model {model_name} loaded successfully. Starting analysis...")
     score = _predict_image(
         model=model,
         image_path=str(image_path),
