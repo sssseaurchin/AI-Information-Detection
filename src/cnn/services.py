@@ -17,9 +17,10 @@ MODELS_FOLDER = path / "models"
 def _predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224), preprocessing_func: Callable | None = None, preprocess_mode: str = "rgb") -> float:
     # Predict if an image is AI-generated or real using TensorFlow ops (GPU-accelerated) - returns confidence score 0.0 to 1.0
     # Check if file exists
+    logging.info(f"Predicting image: {image_path} with model: {model.name}")
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image file not found: {image_path}")
-
+    logging.info(f"Image file found: {image_path}")
     preprocess_callable = preprocessing_func or get_preprocess_fn(preprocess_mode)
     img = preprocess_callable(image_path, label=0, image_size=image_size)[0]  # Get preprocessed image tensor
 
@@ -34,8 +35,9 @@ def _predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (
         img_input = img
 
     # Make prediction (use integer verbose)
+    logging.info(f"Running model prediction on image: {image_path}")
     predictions = model.predict(img_input, verbose=0)
-
+    logging.info(f"Raw model predictions: {predictions}")
     # Extract confidence for AI-generated class (assumes 2-class softmax)
     try:
         confidence = float(predictions[0][1])
