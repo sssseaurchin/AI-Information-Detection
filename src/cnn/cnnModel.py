@@ -8,7 +8,7 @@ import pandas as pd
 import os
 from typing import Callable
 from augmentations import apply_domain_aware_training_augmentations, apply_training_augmentations
-from preprocessing import get_preprocess_fn
+from cnn.preprocessing import get_preprocess_fn
 from split_utils import load_or_create_split_manifest
 
 try:

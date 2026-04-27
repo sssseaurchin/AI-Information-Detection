@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import numpy as np
 import tensorflow as tf
-from preprocessing import get_preprocess_fn
+from cnn.preprocessing import get_preprocess_fn
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 import logging

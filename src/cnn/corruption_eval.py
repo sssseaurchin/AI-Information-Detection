@@ -10,7 +10,7 @@ import tensorflow as tf
 
 from calibration import brier_score_binary, reliability_diagram_binary
 from eval_metrics import threshold_free_metrics, threshold_metrics
-from preprocessing import get_default_preprocess_mode, get_preprocess_fn
+from cnn.preprocessing import get_default_preprocess_mode, get_preprocess_fn
 from split_utils import get_default_manifest_path, load_manifest_dataframe
 
 
