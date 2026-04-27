@@ -1,5 +1,6 @@
 import os
 import pickle
+import logging
 
 # TensorFlow 2.10 typically uses tf.keras (standalone keras may mismatch)
 from tensorflow.keras.models import load_model
@@ -16,15 +17,22 @@ TOKENIZER_PATH = os.path.join(BASE_DIR, "tokenizer.pickle")
 model = None
 tokenizer = None
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logging.info("Trying to load LSTM model and tokenizer...")
 try:
     if not os.path.exists(MODEL_PATH):
+        logging.error(f"Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
         raise FileNotFoundError(f"Missing model file: {MODEL_PATH}")
 
     if not os.path.exists(TOKENIZER_PATH):
+        logging.error(f"Missing tokenizer file: {TOKENIZER_PATH} !!!!!!!!!!!!!!!!!")
         raise FileNotFoundError(f"Missing tokenizer file: {TOKENIZER_PATH}")
 
     model = load_model(MODEL_PATH)
     with open(TOKENIZER_PATH, "rb") as handle:
+        logging.info("Model and tokenizer loaded successfully.")
         tokenizer = pickle.load(handle)
 
 except Exception as e:
@@ -49,5 +57,3 @@ def get_ai_score(text: str) -> float:
     except Exception as e:
         print(f"ERROR during prediction: {e}")
         return -1.0
-
-

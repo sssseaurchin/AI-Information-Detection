@@ -1,4 +1,5 @@
 from .lstm_utils import get_ai_score
+import logging
 
 
 def ping_text_analysis_side(body_json: dict) -> str:
@@ -6,7 +7,9 @@ def ping_text_analysis_side(body_json: dict) -> str:
 
 
 def analyze_text(text: str) -> float:
+    logging.info(f"Analyzing text: {text[:30]}...")  # Log the beginning of the text for reference
     prediction = get_ai_score(text)
+    logging.info(f"Prediction score: {prediction}")
 
     print(f"Input: {text[:30]}... -> Score: {prediction}")
     return prediction
