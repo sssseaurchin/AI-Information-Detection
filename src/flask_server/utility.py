@@ -5,46 +5,38 @@ import uuid
 from pathlib import Path
 
 
-def detect_extension(data: bytes) -> str:
-    """Detect image type from magic bytes"""
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return ".png"
-    if data.startswith(b"\xff\xd8"):
-        return ".jpg"
-    if data.startswith(b"RIFF") and b"WEBP" in data[:12]:
-        return ".webp"
-    raise ValueError("Unsupported or unknown image format")
+UPLOAD_DIR = Path("uploaded_images")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAX_BYTES = 10 * 1024 * 1024
+ALLOWED_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 
 
-def extract_ext_from_data_url(header: str) -> str | None:
-    """Extract extension from data URL header"""
-    if "image/png" in header:
-        return ".png"
-    if "image/jpeg" in header or "image/jpg" in header:
-        return ".jpg"
-    if "image/webp" in header:
-        return ".webp"
-    return None
-
-
-def save_image_from_base64(base64_str: str, ext: str = None) -> Path:
+def save_image_from_base64(base64_str: str, ext: str = ".png") -> Path:
     if not isinstance(base64_str, str) or not base64_str.strip():
         raise ValueError("image_base64 must be a non-empty string")
 
-    s = base64_str.strip()
-    ext_from_header = None
+    ext = (ext or ".png").lower()
+    if ext == "jpeg":
+        ext = ".jpg"
 
-    # Handle data URL
+    if ext == "jpg":
+        ext = ".jpg"
+
+    if ext == ".jpeg":
+        ext = ".jpg"
+    if ext not in ALLOWED_EXT:
+        raise ValueError(f"Unsupported extension: {ext}. Allowed: {sorted(ALLOWED_EXT)}")
+
+    # Handle accidental data URL (even though your frontend strips it)
+    s = base64_str.strip()
     if s.startswith("data:"):
         try:
-            header, s = s.split(",", 1)
-            ext_from_header = extract_ext_from_data_url(header)
+            _, s = s.split(",", 1)
         except ValueError:
             raise ValueError("Invalid data URL format")
 
-    # Decode
     try:
-        data = base64.b64decode(s, validate=True)
+        data = base64.b64decode(s, validate=True)  # image from b64
     except (binascii.Error, ValueError):
         raise ValueError("Invalid base64 payload")
 
@@ -53,34 +45,12 @@ def save_image_from_base64(base64_str: str, ext: str = None) -> Path:
     if len(data) > MAX_BYTES:
         raise ValueError(f"Image too large (> {MAX_BYTES} bytes)")
 
-    # Detect real extension from bytes
-    detected_ext = detect_extension(data)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Final extension decision priority:
-    # 1. Detected from bytes (authoritative)
-    # 2. Data URL header (if consistent)
-    # 3. User-provided ext (ignored if conflicting)
-
-    final_ext = detected_ext
-
-    if ext_from_header and ext_from_header != detected_ext:
-        raise ValueError("Mismatch between data URL type and file content")
-
-    if ext:
-        ext = ext.lower().strip()
-        if not ext.startswith("."):
-            ext = "." + ext
-        if ext == ".jpeg":
-            ext = ".jpg"
-        if ext != detected_ext:
-            raise ValueError("Provided extension does not match file content")
-
-    if final_ext not in ALLOWED_EXT:
-        raise ValueError(f"Unsupported extension: {final_ext}")
-
-    filename = f"{uuid.uuid4().hex}{final_ext}"
+    filename = f"{uuid.uuid4().hex}{ext}"  # generate unique filename on run
     path = UPLOAD_DIR / filename
 
+    # Atomic write
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     with open(tmp_path, "wb") as f:
         f.write(data)
