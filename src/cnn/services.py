@@ -7,7 +7,7 @@ from cnn.preprocessing import get_preprocess_fn
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 from keras.utils import custom_object_scope
-from keras_cv.layers import LayerScale
+from keras.layers import Layer
 import logging
 
 path = Path(__file__).resolve().parent
@@ -15,6 +15,21 @@ path = Path(__file__).resolve().parent
 DEF_MODEL_NAME = "model.h5"
 MODELS_FOLDER = path / "models"
 
+class LayerScale(Layer):
+    def __init__(self, init_values=1e-5, **kwargs):
+        super().__init__(**kwargs)
+        self.init_values = init_values
+
+    def build(self, input_shape):
+        self.gamma = self.add_weight(
+            shape=(input_shape[-1],),
+            initializer=tf.keras.initializers.Constant(self.init_values),
+            trainable=True,
+            name="gamma",
+        )
+
+    def call(self, x):
+        return x * self.gamma
 
 def _predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224), preprocessing_func: Callable | None = None, preprocess_mode: str = "rgb") -> float:
     # Predict if an image is AI-generated or real using TensorFlow ops (GPU-accelerated) - returns confidence score 0.0 to 1.0
@@ -59,7 +74,8 @@ def cnn_analyze_image(image_path, model_name=DEF_MODEL_NAME):
     MODEL_PATH = MODELS_FOLDER / model_name
     logging.info(f"Loading CNN model froms: {MODEL_PATH}")
     try:
-        model = load_model(MODEL_PATH, compile=False)  # LOAD MODEL
+        with custom_object_scope({'LayerScale': LayerScale}):
+            model = load_model(MODEL_PATH, compile=False)
     except Exception as e:
         logging.error(f"Error loading model: {e} AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
         logging.error(f"error mesajı: {str(e)}")
