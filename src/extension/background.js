@@ -1,4 +1,4 @@
-const GATEWAY_URL = "lol";
+const GATEWAY_URL = "http://127.0.0.1:1337";
 
 async function setupMenus() {
     await browser.contextMenus.removeAll();

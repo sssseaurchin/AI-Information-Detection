@@ -6,11 +6,13 @@ import tensorflow as tf
 from cnn.preprocessing import get_preprocess_fn
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
+from keras.utils import custom_object_scope
+from keras_cv.layers import LayerScale
 import logging
 
 path = Path(__file__).resolve().parent
 
-DEF_MODEL_NAME = "efficientnet_v2b0_rgb_20260325.h5"
+DEF_MODEL_NAME = "model.h5"
 MODELS_FOLDER = path / "models"
 
 

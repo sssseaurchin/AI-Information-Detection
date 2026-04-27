@@ -11,7 +11,7 @@ MAX_SEQUENCE_LENGTH = 200
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-MODEL_PATH = os.path.join(BASE_DIR, "model", "lstm_model.h5")
+MODEL_PATH = os.path.join(BASE_DIR, "model", "bilstm_att_model.h5")
 TOKENIZER_PATH = os.path.join(BASE_DIR, "tokenizer.pickle")
 
 model = None
