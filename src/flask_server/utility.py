@@ -16,6 +16,12 @@ def save_image_from_base64(base64_str: str, ext: str = ".png") -> Path:
         raise ValueError("image_base64 must be a non-empty string")
 
     ext = (ext or ".png").lower()
+    if ext == "jpeg":
+        ext = ".jpg"
+
+    if ext == "jpg":
+        ext = ".jpg"
+
     if ext == ".jpeg":
         ext = ".jpg"
     if ext not in ALLOWED_EXT:
