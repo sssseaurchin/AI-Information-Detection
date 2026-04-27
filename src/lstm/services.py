@@ -7,12 +7,26 @@ def ping_text_analysis_side(body_json: dict) -> str:
 
 
 def analyze_text(text: str) -> float:
-    logging.info(f"Analyzing text: {text[:30]}...")  # Log the beginning of the text for reference
-    prediction = get_ai_score(text)
-    logging.info(f"Prediction score: {prediction}")
+    logging.info(f"[LSTM Service] Starting text analysis")
+    logging.debug(f"[LSTM Service] Text length: {len(text)} characters")
+    logging.debug(f"[LSTM Service] Text preview: {text[:50]}...")
 
-    print(f"Input: {text[:30]}... -> Score: {prediction}")
-    return prediction
+    try:
+        prediction = get_ai_score(text)
+        logging.info(f"[LSTM Service] Prediction score obtained: {prediction}")
+
+        if prediction == -1.0:
+            logging.warning(f"[LSTM Service] Model returned error code (-1.0). Model may not be loaded properly.")
+        else:
+            confidence_percent = prediction * 100
+            label = "AI" if prediction > 0.5 else "HUMAN"
+            logging.info(f"[LSTM Service] Classification: {label} (confidence: {confidence_percent:.2f}%)")
+
+        print(f"Input: {text[:30]}... -> Score: {prediction}")
+        return prediction
+    except Exception as e:
+        logging.error(f"[LSTM Service] Exception during analyze_text: {e}", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":

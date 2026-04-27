@@ -88,21 +88,35 @@ def analyze_image():
 # ANALYZE TEXT !!
 @app.post("/analyze_text")
 def analyze_text():
+    logging.info("Received request for /analyze_text endpoint")
+
     payload = request.get_json(silent=True) or {}
+    logging.debug(f"Raw payload keys: {list(payload.keys())}")
+
     text = payload.get("text")
+    logging.debug(f"Text parameter received (length: {len(text) if text else 0} characters)")
 
     if not isinstance(text, str) or not text.strip():
+        logging.warning("Invalid or missing 'text' parameter in request")
         return jsonify({"error": "Missing/Invalid parameter_key: 'text'"}), 400
 
+    logging.info(f"Text validation passed. First 50 chars: {text[:50]}...")
+
     try:
+        logging.info("Calling LSTM analyze_text service")
         confidence = lstm_analyze_text(text=text)
+        logging.info(f"LSTM analysis completed. Confidence score: {confidence}")
     except RuntimeError as e:
+        logging.error(f"RuntimeError during text analysis: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
     except Exception as e:
-        return jsonify({"error": f"Text analysis failed: {e}"}), 500
+        logging.error(f"Unexpected error during text analysis: {e}", exc_info=True)
+        return jsonify({"error": f"Analysis failed: {e}"}), 500
 
-    print(f"Text analyzed with confidence: {confidence}")
-    return jsonify({"label": "Likeness to be Generated", "confidence": confidence, "details": "Someone should write a text classifier for this later"})
+    response = {"confidence": confidence}
+    logging.debug(f"Response payload: {response}")
+    logging.info("Successfully returning /analyze_text response")
+    return jsonify(response)
 
 
 if __name__ == "__main__":
