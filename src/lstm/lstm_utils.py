@@ -1,17 +1,47 @@
 import os
 import pickle
 import logging
+import keras
+import tensorflow as tf
+from keras.models import load_model
+from keras.preprocessing.sequence import pad_sequences
+from keras.utils import custom_object_scope
+from keras import backend as K
 
-# TensorFlow 2.10 typically uses tf.keras (standalone keras may mismatch)
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+# --- Custom Attention Layer ---
+# This class provides the blueprint Keras needs to load your .h5 file.
+class AttentionLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(AttentionLayer, self).__init__(**kwargs)
 
+    def build(self, input_shape):
+        self.W = self.add_weight(name="att_weight", 
+                                 shape=(input_shape[-1], 1),
+                                 initializer="normal")
+        self.b = self.add_weight(name="att_bias", 
+                                 shape=(input_shape[1], 1),
+                                 initializer="zeros")
+        super(AttentionLayer, self).build(input_shape)
+
+    def call(self, x):
+        # Alignment score calculation
+        et = K.squeeze(K.tanh(K.dot(x, self.W) + self.b), axis=-1)
+        at = K.softmax(et)
+        at = K.expand_dims(at, axis=-1)
+        output = x * at
+        return K.sum(output, axis=1)
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[-1])
+
+    def get_config(self):
+        config = super(AttentionLayer, self).get_config()
+        return config
+
+# --- Setup Paths ---
 MAX_SEQUENCE_LENGTH = 200
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-MODEL_NAME = "model.h5"
-MODEL_PATH = os.path.join(BASE_DIR, "model", MODEL_NAME)
+MODEL_PATH = os.path.join(BASE_DIR, "model", "bilstm_att_model.h5")
 TOKENIZER_PATH = os.path.join(BASE_DIR, "tokenizer.pickle")
 
 model = None
@@ -20,64 +50,36 @@ tokenizer = None
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logging.info("Trying to load LSTM model and tokenizer...")
+# --- Loading Logic ---
 try:
-    if not os.path.exists(MODEL_PATH):
-        logging.error(f"\n !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
-        logging.error(f" !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
-        logging.error(f" !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
-        logging.error(f" !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!\n")
-        raise FileNotFoundError(f"Missing model file: {MODEL_PATH}")
-
-    if not os.path.exists(TOKENIZER_PATH):
-        logging.error(f"Missing tokenizer file: {TOKENIZER_PATH} !!!!!!!!!!!!!!!!!")
-        raise FileNotFoundError(f"Missing tokenizer file: {TOKENIZER_PATH}")
-
-    model = load_model(MODEL_PATH)
-    with open(TOKENIZER_PATH, "rb") as handle:
-        logging.info("Model and tokenizer loaded successfully.")
-        tokenizer = pickle.load(handle)
-
+    if os.path.exists(MODEL_PATH) and os.path.exists(TOKENIZER_PATH):
+        # We wrap the load_model call in a scope so Keras knows 
+        # to map the string 'AttentionLayer' to our class above.
+        with custom_object_scope({'AttentionLayer': AttentionLayer}):
+            model = load_model(MODEL_PATH)
+            
+        with open(TOKENIZER_PATH, "rb") as handle:
+            tokenizer = pickle.load(handle)
+        logger.info("LSTM Model and tokenizer loaded successfully.")
+    else:
+        logger.error(f"Files not found: Model={os.path.exists(MODEL_PATH)}, Tokenizer={os.path.exists(TOKENIZER_PATH)}")
 except Exception as e:
-    print(f"ERROR: Model/tokenizer not loaded: {e}")
-
+    logger.error(f"Failed to load LSTM components: {e}")
 
 def get_ai_score(text: str) -> float:
     """Returns a score between 0.0 and 1.0. Returns -1.0 on error."""
-    logger.info("[LSTM Utils] get_ai_score called")
-
     if model is None or tokenizer is None:
-        logger.error("[LSTM Utils] Model or tokenizer is None. Cannot proceed with prediction.")
-        logger.debug(f"[LSTM Utils] Model loaded: {model is not None}, Tokenizer loaded: {tokenizer is not None}")
         return -1.0
-
-    if not isinstance(text, str) or not text.strip():
-        logger.warning("[LSTM Utils] Invalid input: text is not a non-empty string")
-        return -1.0
-
     try:
-        logger.debug(f"[LSTM Utils] Input text length: {len(text)} characters")
-
-        logger.debug("[LSTM Utils] Converting text to lowercase")
-        text_clean = text.lower()
-
-        logger.debug("[LSTM Utils] Tokenizing text")
-        seq = tokenizer.texts_to_sequences([text_clean])
-        logger.debug(f"[LSTM Utils] Tokenized sequence length: {len(seq[0]) if seq and seq[0] else 0}")
-
-        logger.debug(f"[LSTM Utils] Padding sequences to max length: {MAX_SEQUENCE_LENGTH}")
+        # Preprocessing matching the training pipeline
+        seq = tokenizer.texts_to_sequences([text.lower()])
         pad = pad_sequences(seq, maxlen=MAX_SEQUENCE_LENGTH)
-        logger.debug(f"[LSTM Utils] Padded shape: {pad.shape}")
-
-        logger.info("[LSTM Utils] Running model prediction")
+        
+        # Inference
         pred = model.predict(pad, verbose=0)
-        logger.debug(f"[LSTM Utils] Raw prediction output shape: {pred.shape}")
-
-        # pred shape typically (1, 1) for binary sigmoid
-        score = float(pred[0][0])
-        logger.info(f"[LSTM Utils] Prediction score: {score}")
-        return score
+        
+        # Extract scalar value from the prediction tensor
+        return float(pred[0][0])
     except Exception as e:
-        logger.error(f"[LSTM Utils] Exception during prediction: {e}", exc_info=True)
-        print(f"ERROR during prediction: {e}")
+        logging.error(f"Prediction error: {e}")
         return -1.0
