@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 import os
 from typing import Callable
-from augmentations import apply_domain_aware_training_augmentations, apply_training_augmentations
+from cnn.augmentations import apply_domain_aware_training_augmentations, apply_training_augmentations
 from cnn.preprocessing import get_preprocess_fn
-from split_utils import load_or_create_split_manifest
+from cnn.split_utils import load_or_create_split_manifest
 
 try:
     from tensorflow.keras.applications.convnext import preprocess_input as convnext_preprocess
@@ -59,6 +59,7 @@ class HaarWaveletLayer(layers.Layer):
         detail = tf.concat([horizontal, vertical, diagonal], axis=-1)
         detail = detail / (tf.reduce_max(detail, axis=[1, 2, 3], keepdims=True) + 1e-7)
         return tf.image.resize(detail, tf.shape(inputs)[1:3], method="bilinear", antialias=False)
+
 
 def preprocess_regular(path, label, image_size):
     """Compatibility wrapper around the shared RGB preprocessing path."""
@@ -333,11 +334,7 @@ def _build_optimizer(learning_rate, weight_decay: float):
 
 
 def _compile_model(model: tf.keras.Model, optimizer) -> None:
-    model.compile(
-        optimizer=optimizer,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-        metrics=['accuracy']
-    )
+    model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(), metrics=["accuracy"])
 
 
 def _merge_histories(primary: callbacks.History, secondary: callbacks.History) -> callbacks.History:
@@ -426,10 +423,7 @@ class SliceValidationLogger(callbacks.Callback):
         for column in self.slice_columns:
             if column not in self.val_frame.columns:
                 continue
-            values = [
-                value for value in sorted(self.val_frame[column].dropna().astype(str).unique().tolist())
-                if value.strip()
-            ]
+            values = [value for value in sorted(self.val_frame[column].dropna().astype(str).unique().tolist()) if value.strip()]
             if not values:
                 continue
 
@@ -488,27 +482,45 @@ def _get_pipeline_settings(has_gpu: bool, batch_size: int, enable_augmentation: 
 
     return parallel_calls, prefetch_batches, shuffle_buffer
 
-def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, validation_split: float = 0.2,
-                use_cache: bool = True, cache_in_memory: bool = False,
-                use_mixed_precision: bool = True, enable_augmentation: bool = False,
-                model_save_path: str = "", preprocess_func: Callable | None = None, image_size: tuple = (224, 224),
-                enable_early_stopping: bool = True, seed: int = 42, label_mapping: dict[str, int] | None = None,
-                preprocess_mode: str = "rgb", split_manifest_path: str | None = None, regen_split: bool = False,
-                allow_unknown: bool = False, arch: str = "simple", finetune_unfreeze: bool = False,
-                finetune_freeze_epochs: int = 3, finetune_lr: float = 1e-5,
-                finetune_weight_decay: float = 1e-5, early_stopping_patience: int = 1,
-                sampling_strategy: str = "domain_balanced",
-                enable_slice_logging: bool = True) -> tuple[tf.keras.Model, callbacks.History]:
+
+def train_model(
+    dataset_path: str,
+    epochs: int = 10,
+    batch_size: int = 32,
+    validation_split: float = 0.2,
+    use_cache: bool = True,
+    cache_in_memory: bool = False,
+    use_mixed_precision: bool = True,
+    enable_augmentation: bool = False,
+    model_save_path: str = "",
+    preprocess_func: Callable | None = None,
+    image_size: tuple = (224, 224),
+    enable_early_stopping: bool = True,
+    seed: int = 42,
+    label_mapping: dict[str, int] | None = None,
+    preprocess_mode: str = "rgb",
+    split_manifest_path: str | None = None,
+    regen_split: bool = False,
+    allow_unknown: bool = False,
+    arch: str = "simple",
+    finetune_unfreeze: bool = False,
+    finetune_freeze_epochs: int = 3,
+    finetune_lr: float = 1e-5,
+    finetune_weight_decay: float = 1e-5,
+    early_stopping_patience: int = 1,
+    sampling_strategy: str = "domain_balanced",
+    enable_slice_logging: bool = True,
+) -> tuple[tf.keras.Model, callbacks.History]:
     # Train the CNN model for AI-generated image detection - returns trained model and training history
     np.random.seed(seed)
     tf.random.set_seed(seed)
-    
-    gpus = tf.config.experimental.list_physical_devices('GPU')
+
+    gpus = tf.config.experimental.list_physical_devices("GPU")
     mixed_precision_enabled = bool(use_mixed_precision and gpus)
 
     # Enable mixed precision only when a GPU is available.
     if mixed_precision_enabled:
-        policy = tf.keras.mixed_precision.Policy('mixed_float16')
+        policy = tf.keras.mixed_precision.Policy("mixed_float16")
         tf.keras.mixed_precision.set_global_policy(policy)
         print("Mixed precision training enabled for GPU performance")
 
@@ -522,7 +534,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
             print(f"GPU configuration error: {e}")
     elif use_mixed_precision:
         print("No GPU detected; mixed precision disabled for this run.")
-    
+
     if label_mapping is None:
         raise ValueError("train_model requires an explicit label_mapping.")
     num_classes = max(label_mapping.values()) + 1
@@ -558,23 +570,21 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
 
     # Create train dataset with optimized pipeline
     train_dataset = tf.data.Dataset.from_tensor_slices((train_paths, train_labels, train_domains))
-    
+
     # Map: Load and preprocess images (GPU-accelerated, parallel)
     # Ignore errors for corrupt images (skip them instead of crashing)
     train_dataset = train_dataset.map(
-        lambda path, label, domain: (*preprocess_callable(path, label, image_size), domain),
-        num_parallel_calls=pipeline_parallel_calls,
-        deterministic=False
+        lambda path, label, domain: (*preprocess_callable(path, label, image_size), domain), num_parallel_calls=pipeline_parallel_calls, deterministic=False
     )
-    
+
     # Filter out any invalid images (shape mismatches, etc.)
     # Note: Corrupt JPEG files will be caught by decode_jpeg and cause an error
     # We need to handle this at the dataset level
     train_dataset = train_dataset.filter(lambda img, label, domain: tf.shape(img)[0] == image_size[0])
-    
+
     # Ignore errors for corrupt images - skip them instead of crashing
     train_dataset = train_dataset.ignore_errors()
-    
+
     # Apply data augmentation if enabled (only for training)
     if enable_augmentation:
         train_dataset = train_dataset.map(
@@ -610,17 +620,13 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
 
     # Prefetch: Prepare next batch while GPU is training
     train_dataset = train_dataset.prefetch(prefetch_batches)
-    
+
     # Create val dataset with optimized pipeline
     val_dataset = tf.data.Dataset.from_tensor_slices((val_paths, val_labels))
 
     # Map: Load and preprocess images (GPU-accelerated, parallel)
-    val_dataset = val_dataset.map(
-        lambda path, label: preprocess_callable(path, label, image_size),
-        num_parallel_calls=pipeline_parallel_calls,
-        deterministic=False
-    )
-    
+    val_dataset = val_dataset.map(lambda path, label: preprocess_callable(path, label, image_size), num_parallel_calls=pipeline_parallel_calls, deterministic=False)
+
     # Filter out any invalid images
     val_dataset = val_dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
 
@@ -647,7 +653,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
 
     # Prefetch: Prepare next batch while GPU is validating
     val_dataset = val_dataset.prefetch(prefetch_batches)
-    
+
     # Build model
     model = build_model(
         arch=arch,
@@ -674,16 +680,10 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
                 parallel_calls=pipeline_parallel_calls,
             )
         )
-    
+
     # Early stopping to prevent overfitting
     if enable_early_stopping:
-        early_stopping = callbacks.EarlyStopping(
-            monitor='val_loss',
-            min_delta=0.001,
-            patience=early_stopping_patience,
-            restore_best_weights=True,
-            verbose=1
-        )
+        early_stopping = callbacks.EarlyStopping(monitor="val_loss", min_delta=0.001, patience=early_stopping_patience, restore_best_weights=True, verbose=1)
         callback_list.append(early_stopping)
 
     # Model checkpointing
@@ -691,50 +691,31 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         checkpoint_dir = os.path.dirname(model_save_path)
         if checkpoint_dir and not os.path.exists(checkpoint_dir):
             os.makedirs(checkpoint_dir, exist_ok=True)
-        
+
         checkpoint_path = model_save_path
-        if not checkpoint_path.endswith(('.h5', '.keras')):
+        if not checkpoint_path.endswith((".h5", ".keras")):
             checkpoint_path = f"{checkpoint_path}.keras"
 
-        model_checkpoint = callbacks.ModelCheckpoint(
-            filepath=checkpoint_path,
-            monitor='val_loss',
-            save_best_only=True,
-            save_weights_only=False,
-            verbose=1
-        )
+        model_checkpoint = callbacks.ModelCheckpoint(filepath=checkpoint_path, monitor="val_loss", save_best_only=True, save_weights_only=False, verbose=1)
         callback_list.append(model_checkpoint)
 
         metrics_log_path = os.path.join(checkpoint_dir, "training_metrics.csv")
         callback_list.append(callbacks.CSVLogger(metrics_log_path, append=False))
-    
+
     # Train model
     print(f"\nUsing split manifest: {manifest_path}")
     print(f"Training with {len(train_paths)} training samples and {len(val_paths)} validation samples")
     print(f"Batch size: {batch_size}, Epochs: {epochs}, Seed: {seed}, Preprocessing: {preprocess_mode}, Arch: {arch}\n")
     print(f"Sampling strategy: {sampling_strategy}\n")
-    print(
-        f"Pipeline settings: parallel_calls={pipeline_parallel_calls}, "
-        f"shuffle_buffer={min(shuffle_buffer, len(train_paths))}, prefetch={prefetch_batches}\n"
-    )
+    print(f"Pipeline settings: parallel_calls={pipeline_parallel_calls}, " f"shuffle_buffer={min(shuffle_buffer, len(train_paths))}, prefetch={prefetch_batches}\n")
     if model_save_path and model_save_path != "":
         print(f"Metrics CSV: {os.path.join(os.path.dirname(model_save_path), 'training_metrics.csv')}\n")
 
     normalized_arch = arch.strip().lower()
-    should_finetune = (
-        _supports_staged_finetune(normalized_arch)
-        and finetune_unfreeze
-        and epochs > finetune_freeze_epochs
-    )
+    should_finetune = _supports_staged_finetune(normalized_arch) and finetune_unfreeze and epochs > finetune_freeze_epochs
     warmup_epochs = min(epochs, finetune_freeze_epochs) if should_finetune else epochs
 
-    history = model.fit(
-        train_dataset,
-        validation_data=val_dataset,
-        epochs=warmup_epochs,
-        callbacks=callback_list,
-        verbose=2
-    )
+    history = model.fit(train_dataset, validation_data=val_dataset, epochs=warmup_epochs, callbacks=callback_list, verbose=2)
 
     if should_finetune:
         backbone = getattr(model, "_backbone", None)
@@ -748,18 +729,11 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         )
         _compile_model(model, finetune_optimizer)
 
-        fine_tune_history = model.fit(
-            train_dataset,
-            validation_data=val_dataset,
-            initial_epoch=warmup_epochs,
-            epochs=epochs,
-            callbacks=callback_list,
-            verbose=2
-        )
+        fine_tune_history = model.fit(train_dataset, validation_data=val_dataset, initial_epoch=warmup_epochs, epochs=epochs, callbacks=callback_list, verbose=2)
         history = _merge_histories(history, fine_tune_history)
 
     # Reset mixed precision policy if it was enabled
     if mixed_precision_enabled:
-        tf.keras.mixed_precision.set_global_policy('float32')
-    
+        tf.keras.mixed_precision.set_global_policy("float32")
+
     return model, history

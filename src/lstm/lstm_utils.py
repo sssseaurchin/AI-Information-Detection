@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 logging.info("Trying to load LSTM model and tokenizer...")
 try:
     if not os.path.exists(MODEL_PATH):
-        logging.error(f"Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
+        logging.error(f"\n !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
+        logging.error(f" !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
+        logging.error(f" !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
+        logging.error(f" !!!!!! Missing model file: {MODEL_PATH} !!!!!!!!!!!!!!!!!\n")
         raise FileNotFoundError(f"Missing model file: {MODEL_PATH}")
 
     if not os.path.exists(TOKENIZER_PATH):

@@ -9,11 +9,13 @@ from tensorflow.keras.preprocessing import image
 from keras.utils import custom_object_scope
 from keras.layers import Layer
 import logging
+from cnn.cnnModel import SobelMagnitudeLayer, HaarWaveletLayer  # new stuff
 
 path = Path(__file__).resolve().parent
 
 DEF_MODEL_NAME = "model.h5"
 MODELS_FOLDER = path / "models"
+
 
 class LayerScale(Layer):
     def __init__(self, init_values=1e-5, **kwargs):
@@ -30,6 +32,7 @@ class LayerScale(Layer):
 
     def call(self, x):
         return x * self.gamma
+
 
 def _predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224), preprocessing_func: Callable | None = None, preprocess_mode: str = "rgb") -> float:
     # Predict if an image is AI-generated or real using TensorFlow ops (GPU-accelerated) - returns confidence score 0.0 to 1.0
@@ -73,13 +76,29 @@ def _predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (
 def cnn_analyze_image(image_path, model_name=DEF_MODEL_NAME):
     MODEL_PATH = MODELS_FOLDER / model_name
     logging.info(f"Loading CNN model froms: {MODEL_PATH}")
+
+    if not os.path.exists(MODEL_PATH):
+        logging.error(f"\n!!!!!!!! CNN Model file not found: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
+        logging.error(f"!!!!!!!! CNN Model file not found: {MODEL_PATH} !!!!!!!!!!!!!!!!!")
+        logging.error(f"!!!!!!!! CNN Model file not found: {MODEL_PATH} !!!!!!!!!!!!!!!!!\n")
+
+        raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
     try:
-        with custom_object_scope({'LayerScale': LayerScale}):
+        with custom_object_scope(
+            {
+                "LayerScale": LayerScale,
+                "SobelMagnitudeLayer": SobelMagnitudeLayer,
+                "aid>SobelMagnitudeLayer": HaarWaveletLayer,
+                "HaarWaveletLayer": HaarWaveletLayer,
+                "aid>HaarWaveletLayer": HaarWaveletLayer,
+            }
+        ):
             model = load_model(MODEL_PATH, compile=False)
+
     except Exception as e:
-        logging.error(f"Error loading model: {e} AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
-        logging.error(f"error mesajı: {str(e)}")
+        # logging.exception(f"Error loading CNN model: {e}")
         raise e
+
     logging.info(f"stringified image_path: {str(image_path)}")
     logging.info(f"Model {model_name} loaded successfully. Starting analysis...")
     score = _predict_image(
@@ -91,19 +110,6 @@ def cnn_analyze_image(image_path, model_name=DEF_MODEL_NAME):
     )
 
     return score
-
-
-def verify_model_existence(model_name=None) -> dict:
-    """if we want to change the model used for image detect. on runtime
-    mode_name: name of the model with .h5 extension, should be inside model folder
-    Return: # dict:{"status":200|404, "errorMsg":}
-    """
-
-    pass
-
-
-def get_model_summary(model_name=DEF_MODEL_NAME) -> dict:  # dict:{"status":200|404, "errorMsg":}
-    pass
 
 
 if __name__ == "__main__":
