@@ -16,11 +16,16 @@ DEF_MODEL_NAME = "model.h5"
 MODELS_FOLDER = path / "models"
 
 class LayerScale(Layer):
-    def __init__(self, init_values=1e-5, **kwargs):
+    # We add 'projection_dim=None' to explicitly catch it, 
+    # and '**kwargs' to catch anything else Keras throws at us.
+    def __init__(self, init_values=1e-5, projection_dim=None, **kwargs):
         super().__init__(**kwargs)
         self.init_values = init_values
+        # Even if we don't use projection_dim, we store it to stay compatible
+        self.projection_dim = projection_dim
 
     def build(self, input_shape):
+        # Use the last dimension of input_shape for the weight
         self.gamma = self.add_weight(
             shape=(input_shape[-1],),
             initializer=keras.initializers.Constant(self.init_values),
@@ -31,6 +36,13 @@ class LayerScale(Layer):
     def call(self, x):
         return x * self.gamma
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "init_values": self.init_values,
+            "projection_dim": self.projection_dim,
+        })
+        return config
 def _predict_image(model, image_path: str, image_size=(224, 224), preprocessing_func=None, preprocess_mode="rgb") -> float:
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image not found: {image_path}")

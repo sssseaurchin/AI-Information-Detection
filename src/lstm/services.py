@@ -1,3 +1,6 @@
+import os
+import tensorflow as tf
+import numpy as np
 from .lstm_utils import get_ai_score
 import logging
 
@@ -5,6 +8,11 @@ import logging
 def ping_text_analysis_side(body_json: dict) -> str:
     return {"message": "send successfull", "status": 200, "body_recieved": body_json}
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MODEL_PATH = os.path.join(BASE_DIR, "model", "bilstm_att_model.h5")
+
+TOKENIZER_PATH = os.path.join(BASE_DIR, "tokenizer.pickle")
 
 def analyze_text(text: str) -> float:
     logging.info(f"[LSTM Service] Starting text analysis")

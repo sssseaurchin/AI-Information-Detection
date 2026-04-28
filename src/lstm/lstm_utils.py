@@ -39,7 +39,7 @@ class AttentionLayer(keras.layers.Layer):
         return config
 
 # --- Setup Paths ---
-MAX_SEQUENCE_LENGTH = 200
+MAX_SEQUENCE_LENGTH = 300
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "model", "bilstm_att_model.h5")
 TOKENIZER_PATH = os.path.join(BASE_DIR, "tokenizer.pickle")
