@@ -113,6 +113,10 @@ def analyze_text():
         logging.error(f"Unexpected error during text analysis: {e}", exc_info=True)
         return jsonify({"error": f"Analysis failed: {e}"}), 500
 
+    if confidence == -1.0:
+        logging.error("LSTM service returned error code (-1.0). Check model loading and input validity.")
+        return jsonify({"error": "Text analysis failed due to internal error."}), 500
+
     response = {"confidence": confidence}
     logging.debug(f"Response payload: {response}")
     logging.info("Successfully returning /analyze_text response")
