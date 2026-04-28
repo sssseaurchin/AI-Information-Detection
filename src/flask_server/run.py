@@ -1,14 +1,13 @@
 import os
 import sys
 import logging
-import traceback # Added for detailed error reporting
+import traceback
 from pathlib import Path
 
 # Force TensorFlow 2.15 to use Legacy Keras behavior
 os.environ["TF_USE_LEGACY_KERAS"] = "1"
 
 # --- Logging Configuration ---
-# This prints errors to your terminal with timestamps
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -28,6 +27,7 @@ else:
 
 from lstm.services import analyze_text as lstm_analyze_text
 from cnn.services import cnn_analyze_image
+from utility import get_str_message_from_confidence_score
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -41,7 +41,7 @@ def handle_exception(e):
     return jsonify({
         "error": "Internal Server Error",
         "message": str(e),
-        "traceback": msg.split('\n')[-2] # Gives you the last line of the error
+        "traceback": msg.split('\n')[-2] 
     }), 500
 
 @app.get("/")
@@ -62,16 +62,38 @@ def analyze_image():
     if not b64:
         return jsonify({"error": "Missing image data"}), 400
 
-    image_path = save_image_from_base64(base64_str=b64, ext=extension)
-    
-    # We removed the local try/except here so the global handler 
-    # can catch and log the full traceback for us.
-    confidence = cnn_analyze_image(image_path, model_name=model_preferred) if model_preferred else cnn_analyze_image(image_path)
-    
-    return jsonify({
-        "confidence": confidence, 
-        "details": {"model_used": model_preferred or "default"}
-    })
+    try:
+        image_path = save_image_from_base64(base64_str=b64, ext=extension)
+        confidence = cnn_analyze_image(image_path, model_name=model_preferred) if model_preferred else cnn_analyze_image(image_path)
+        # return jsonify({"confidence": confidence, "details": {"model_used": model_preferred or "default"}})
+    except Exception as e:
+        logging.error(f"Failed to save image: {e}", exc_info=True)
+        return jsonify({"error": f"Failed on saving image! {e}"}), 400
+
+    # Run inference
+    try:
+        if model_preferred:
+            logging.info(f"Running inference with model: {model_preferred}")
+            confidence = cnn_analyze_image(image_path, model_name=model_preferred)
+        else:
+            logging.info("Running inference with default model")
+            confidence = cnn_analyze_image(image_path)
+
+        logging.info(f"Inference completed. Confidence: {confidence}")
+
+    except Exception as e:
+        logging.error(f"Inference failed: {e}", exc_info=True)
+        return jsonify({"error": f"Inference failed: {e}"}), 500
+
+    response = {
+        "confidence": confidence,
+        "message": get_str_message_from_confidence_score(confidence),
+        "details": {"model_used": model_preferred if model_preferred else "default_model_set"},
+    }
+
+    logging.debug(f"Response payload: {response}")
+    return jsonify(response)
+
 
 @app.post("/analyze_text")
 def analyze_text():
@@ -80,11 +102,26 @@ def analyze_text():
     if not isinstance(text, str) or not text.strip():
         return jsonify({"error": "Missing/Invalid text"}), 400
 
-    confidence = lstm_analyze_text(text=text)
-    if confidence == -1.0:
-        return jsonify({"error": "Internal LSTM error"}), 500
-    return jsonify({"confidence": confidence})
+    try:
+        confidence = lstm_analyze_text(text=text)
+	
+        if confidence == -1.0:
+            return jsonify({"error": "Internal LSTM error"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error during text analysis: {e}", exc_info=True)
+        return jsonify({"error": f"Analysis failed: {e}"}), 500
+
+    response = {"confidence": confidence, "message": get_str_message_from_confidence_score(confidence)}
+    logging.debug(f"Response payload: {response}")
+																	
+	 
+	
+    logging.info("Successfully returning /analyze_text response")
+    return jsonify(response)
+
+
 
 if __name__ == "__main__":
-    # debug=True is critical here; it reloads the server when you change code
     app.run(host="0.0.0.0", port=1337, debug=True)

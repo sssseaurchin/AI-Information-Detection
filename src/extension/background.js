@@ -1,5 +1,8 @@
 const GATEWAY_URL = "http://127.0.0.1:1337";
 
+// Global lock to prevent overlapping analysis requests
+let isBusy = false;
+
 async function setupMenus() {
     await browser.contextMenus.removeAll();
 
@@ -18,42 +21,39 @@ async function setupMenus() {
 
 browser.runtime.onInstalled.addListener(setupMenus);
 browser.runtime.onStartup.addListener(setupMenus);
-
 setupMenus();
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
+    // 1. Guard Clause: Strictly prevent spamming if already processing
+    if (isBusy) {
+        browser.notifications.create({
+            type: "basic",
+            iconUrl: "icon.png",
+            title: "Analysis in Progress",
+            message: "Please wait for the current analysis to finish."
+        });
+        return;
+    }
+
     let endpoint = "";
     let payload = {};
     let previewData = {};
 
     if (info.menuItemId === "analyze-image") {
         endpoint = "/analyze_image";
-
         let targetUrl = info.srcUrl;
 
         try {
-            const response = await browser.tabs.sendMessage(tab.id, {
-                action: "GET_IMAGE_DATA"
-            });
-
-            if (response && response.url) {
-                targetUrl = response.url;
-            }
+            const response = await browser.tabs.sendMessage(tab.id, { action: "GET_IMAGE_DATA" });
+            if (response && response.url) targetUrl = response.url;
         } catch (e) {
             console.error("Content script not responding, using default URL.");
         }
 
-        if (!targetUrl) {
-            console.error("Could not find an image URL.");
-            return;
-        }
+        if (!targetUrl) return;
 
         const base64 = await fetchAndCompress(targetUrl);
-
-        if (!base64) {
-            console.error("Base64 conversion failed.");
-            return;
-        }
+        if (!base64) return;
 
         payload.image = base64;
         previewData = { type: 'image', content: targetUrl };
@@ -66,35 +66,21 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 
     if (endpoint) {
         await browser.storage.local.set({ lastInput: previewData });
-        performBackgroundAnalysis(endpoint, payload);
+        // 2. Pass previewData into the analysis to maintain history integrity
+        performBackgroundAnalysis(endpoint, payload, previewData);
     }
 });
 
-async function fetchAndCompress(url) {
-    try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-            reader.readAsDataURL(blob);
-        });
-    } catch (e) {
-        console.error("Failed to fetch image:", e);
-        return null;
-    }
-}
-
-async function performBackgroundAnalysis(endpoint, payload) {
+async function performBackgroundAnalysis(endpoint, payload, inputData) {
+    // 3. Set the Lock
+    isBusy = true;
     browser.action.setBadgeText({ text: "..." });
     browser.action.setBadgeBackgroundColor({ color: "#aaaaaa" });
 
     try {
         const response = await fetch(GATEWAY_URL + endpoint, {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
             keepalive: true
         });
@@ -103,17 +89,8 @@ async function performBackgroundAnalysis(endpoint, payload) {
 
         const data = await response.json();
 
-        const { history = [] } = await browser.storage.local.get("history");
-        const { lastInput } = await browser.storage.local.get("lastInput");
-
-        const newEntry = {
-            input: lastInput,
-            result: data,
-            timestamp: Date.now()
-        };
-
-        const updatedHistory = [newEntry, ...history].slice(0, 5);
-        await browser.storage.local.set({ history: updatedHistory });
+        // Use your existing helper for successful results
+        await addToHistory(inputData, data);
 
         browser.action.setBadgeText({ text: "!" });
         browser.action.setBadgeBackgroundColor({ color: "#22c55e" });
@@ -122,32 +99,26 @@ async function performBackgroundAnalysis(endpoint, payload) {
             type: "basic",
             iconUrl: "icon.png",
             title: "Analysis Complete",
-            message: `Result: ${data.label}`
+            message: `Result: ${data.message}`
         });
 
     } catch (err) {
         console.error("Detailed Analysis Error:", err);
-
         browser.action.setBadgeText({ text: "ERR" });
         browser.action.setBadgeBackgroundColor({ color: "#ef4444" });
 
-        const { history = [] } = await browser.storage.local.get("history");
-        const { lastInput } = await browser.storage.local.get("lastInput");
-
-        const errorEntry = {
-            input: lastInput,
-            result: { label: "Error", confidence: 0, error: err.message },
-            timestamp: Date.now()
-        };
-
-        await browser.storage.local.set({
-            history: [errorEntry, ...history].slice(0, 5)
-        });
+        // Maintain history even on error using your helper
+        await addToHistory(inputData, { label: "Error", confidence: 0, error: err.message });
+        
+    } finally {
+        // 4. THE UNLOCK: Guaranteed to run
+        isBusy = false;
     }
 }
 
+// EXACT IMPLEMENTATION of your addToHistory helper
 async function addToHistory(input, result) {
-    const {history = []} = await browser.storage.local.get("history");
+    const { history = [] } = await browser.storage.local.get("history");
 
     const newEntry = {
         id: Date.now(),
@@ -164,22 +135,18 @@ async function addToHistory(input, result) {
     });
 }
 
-function getImageData(targetUrl) {
-    const img = document.querySelector(`img[src="${targetUrl}"]`);
-    if (!img) return null;
-
+// EXACT IMPLEMENTATION of your fetch helper
+async function fetchAndCompress(url) {
     try {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-
-        const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
-        return dataUrl.split(',')[1];
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.readAsDataURL(blob);
+        });
     } catch (e) {
-        console.error("Canvas grab failed (likely strict CSP):", e);
+        console.error("Failed to fetch image:", e);
         return null;
     }
 }
