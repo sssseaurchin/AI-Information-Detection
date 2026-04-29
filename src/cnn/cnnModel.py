@@ -5,7 +5,7 @@ from tensorflow.keras.applications.efficientnet_v2 import preprocess_input as ef
 from tensorflow.keras.applications.resnet import preprocess_input as resnet_preprocess
 import numpy as np
 import pandas as pd
-import os 
+import os
 from typing import Callable
 from augmentations import apply_domain_aware_training_augmentations, apply_training_augmentations
 from preprocessing import get_preprocess_fn
@@ -70,78 +70,44 @@ def preprocess_sobel_edge(path, label, image_size):
     return get_preprocess_fn("sobel")(path, label, image_size)
 
 
-def get_covariance_matrix(path: str) -> tuple[tf.Tensor, tf.Tensor]:
-    """Returns a [2,2] tf.Tensor of sobel edge covariants for given image.
-
-    Args:
-        path (_str_): _Path to image file_
-
-    Returns:
-        tuple[tf.Tensor, tf.Tensor]: _A [2,2] covariance matrix of the given image_
-    """
-    
-    img_bytes = tf.io.read_file(path)
-    img = tf.io.decode_image(img_bytes, channels=3, expand_animations=False)
-    img = tf.ensure_shape(img, [None, None, 3])
-    img = tf.cast(img, tf.float32)
-    
-    luminance = tf.cast(0.2126 * img[..., 0] + 0.7152 * img[..., 1] + 0.0722 * img[..., 2], tf.float32) # [x, y]
-    
-    sobel = tf.image.sobel_edges(tf.expand_dims(luminance))
-    
-    Gx = sobel[..., 0]
-    Gy = sobel[..., 1]
-    
-    Gx_flat = tf.reshape(Gx, [-1])
-    Gy_flat = tf.reshape(Gy, [-1])    
-    
-    M = tf.stack([Gx_flat, Gy_flat], axis=1)  # shape [N, 2]
-    
-    N = tf.cast(tf.shape(M)[0], tf.float32)
-    C = tf.matmul(M, M, transpose_a=True) / N # shape [2, 2] Covariance matrix
-    
-    return C
-
 def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
-    model = models.Sequential([
-        # First convolutional block
-        layers.Conv2D(32, (3, 3), padding='same', input_shape=input_shape),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-        
-        # Second convolutional block
-        layers.Conv2D(64, (3, 3), padding='same'),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-        
-        # Third convolutional block
-        layers.Conv2D(128, (3, 3), padding='same'),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-        
-        # Fourth convolutional block
-        layers.Conv2D(128, (3, 3), padding='same'),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Dropout(0.25),
-        
-        # Flatten and dense layers
-        layers.Flatten(),
-        layers.Dense(512),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.Dropout(0.5),
-        layers.Dense(num_classes, activation='softmax')
-    ])
-    
+    model = models.Sequential(
+        [
+            # First convolutional block
+            layers.Conv2D(32, (3, 3), padding="same", input_shape=input_shape),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Second convolutional block
+            layers.Conv2D(64, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Third convolutional block
+            layers.Conv2D(128, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Fourth convolutional block
+            layers.Conv2D(128, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Flatten and dense layers
+            layers.Flatten(),
+            layers.Dense(512),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.Dropout(0.5),
+            layers.Dense(num_classes, activation="softmax"),
+        ]
+    )
+
     return model
 
 
@@ -589,7 +555,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     val_paths = val_frame["path"].to_numpy()
     val_labels = val_frame["label"].astype(int).to_numpy()
     num_samples = len(usable_manifest)
-    
+
     # Create train dataset with optimized pipeline
     train_dataset = tf.data.Dataset.from_tensor_slices((train_paths, train_labels, train_domains))
     
@@ -620,10 +586,10 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         lambda img, label, domain: _apply_arch_preprocessing(img, label, arch),
         num_parallel_calls=pipeline_parallel_calls,
     )
-    
+
     # Batch: Group into batches
     train_dataset = train_dataset.batch(batch_size, drop_remainder=False)
-    
+
     # Cache: Store preprocessed images (memory or disk based on parameter)
     if use_cache:
         if cache_in_memory:
@@ -631,23 +597,23 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         else:
             # Use disk cache only if dataset is reasonably sized (< 100K images)
             if num_samples < 100000:
-                train_dataset = train_dataset.cache(os.path.join(dataset_path, 'train_cache'))
+                train_dataset = train_dataset.cache(os.path.join(dataset_path, "train_cache"))
             else:
                 print("Warning: Dataset too large for disk cache, skipping cache for better performance")
-                
+
     # Shuffle: Randomize order (after cache for efficiency)
     train_dataset = train_dataset.shuffle(
         buffer_size=min(shuffle_buffer, len(train_paths)),
         seed=seed,
         reshuffle_each_iteration=True,
-    ) #TODO Change buffer size?
-    
+    )  # TODO Change buffer size?
+
     # Prefetch: Prepare next batch while GPU is training
     train_dataset = train_dataset.prefetch(prefetch_batches)
     
     # Create val dataset with optimized pipeline
     val_dataset = tf.data.Dataset.from_tensor_slices((val_paths, val_labels))
-    
+
     # Map: Load and preprocess images (GPU-accelerated, parallel)
     val_dataset = val_dataset.map(
         lambda path, label: preprocess_callable(path, label, image_size),
@@ -657,7 +623,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     
     # Filter out any invalid images
     val_dataset = val_dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
-    
+
     # Ignore errors for corrupt images
     val_dataset = val_dataset.ignore_errors()
 
@@ -665,20 +631,20 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         lambda img, label: _apply_arch_preprocessing(img, label, arch),
         num_parallel_calls=pipeline_parallel_calls,
     )
-    
+
     # Batch: Group into batches (no shuffle for validation)
     val_dataset = val_dataset.batch(batch_size, drop_remainder=False)
-    
+
     # Cache: Store preprocessed images
     if use_cache:
         if cache_in_memory:
             val_dataset = val_dataset.cache()  # Memory cache
         else:
             if num_samples < 100000:
-                val_dataset = val_dataset.cache(os.path.join(dataset_path, 'val_cache'))
+                val_dataset = val_dataset.cache(os.path.join(dataset_path, "val_cache"))
             else:
                 print("Warning: Dataset too large for disk cache, skipping cache for better performance")
-    
+
     # Prefetch: Prepare next batch while GPU is validating
     val_dataset = val_dataset.prefetch(prefetch_batches)
     
@@ -688,17 +654,12 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         input_shape=(image_size[0], image_size[1], 3),
         num_classes=num_classes,
     )
-    
+
     initial_learning_rate = 0.001
-    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-        initial_learning_rate=initial_learning_rate,
-        decay_steps=1000,
-        decay_rate=0.96,
-        staircase=True
-    )
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=initial_learning_rate, decay_steps=1000, decay_rate=0.96, staircase=True)
     optimizer = _build_optimizer(learning_rate=lr_schedule, weight_decay=1e-4)
     _compile_model(model, optimizer)
-    
+
     # Setup callbacks
     callback_list = []
     callback_list.append(EpochSummaryLogger())
@@ -724,7 +685,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
             verbose=1
         )
         callback_list.append(early_stopping)
-    
+
     # Model checkpointing
     if model_save_path and model_save_path != "":
         checkpoint_dir = os.path.dirname(model_save_path)
@@ -796,20 +757,20 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
             verbose=2
         )
         history = _merge_histories(history, fine_tune_history)
-    
+
     # Reset mixed precision policy if it was enabled
     if mixed_precision_enabled:
         tf.keras.mixed_precision.set_global_policy('float32')
     
     return model, history
 
-def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224),
-                  preprocessing_func: Callable | None = None, preprocess_mode: str = "rgb") -> float:
+
+def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (224, 224), preprocessing_func: Callable | None = None, preprocess_mode: str = "rgb") -> float:
     # Predict if an image is AI-generated or real using TensorFlow ops (GPU-accelerated) - returns confidence score 0.0 to 1.0
     # Check if file exists
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image file not found: {image_path}")
-    
+
     preprocess_callable = preprocessing_func or get_preprocess_fn(preprocess_mode)
     img = preprocess_callable(image_path, label=0, image_size=image_size)[0]  # Get preprocessed image tensor
 

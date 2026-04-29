@@ -28,7 +28,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 
  
-data_path: Path = Path("data/data/AI_Human_cleaned.csv")
+data_path: Path = Path("data_center/data/AI_Human_cleaned.csv")
 
 max_nb_words: int = 20_000
 max_sequence_length: int = 200
