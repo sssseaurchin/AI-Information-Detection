@@ -16,6 +16,41 @@ from preprocessing import get_preprocess_fn
 from split_utils import load_manifest_dataframe
 
 
+def _load_model_with_known_custom_objects(model_path: str) -> tf.keras.Model:
+    """Load saved models while accounting for application-specific layers."""
+    custom_objects: dict[str, Any] = {}
+
+    try:
+        from cnnModel import HaarWaveletLayer, SobelMagnitudeLayer
+
+        custom_objects["SobelMagnitudeLayer"] = SobelMagnitudeLayer
+        custom_objects["HaarWaveletLayer"] = HaarWaveletLayer
+    except Exception:
+        pass
+
+    try:
+        from keras.src.applications.convnext import LayerScale, StochasticDepth
+
+        custom_objects["LayerScale"] = LayerScale
+        custom_objects["StochasticDepth"] = StochasticDepth
+    except Exception:
+        pass
+
+    try:
+        from transformers import TFCLIPVisionModel
+
+        custom_objects["TFCLIPVisionModel"] = TFCLIPVisionModel
+    except Exception:
+        pass
+
+    return tf.keras.models.load_model(
+        model_path,
+        compile=False,
+        custom_objects=custom_objects or None,
+        safe_mode=False,
+    )
+
+
 def _load_manifest(manifest_path: str) -> pd.DataFrame:
     if not os.path.exists(manifest_path):
         raise FileNotFoundError(f"Split manifest not found: {manifest_path}")
@@ -101,12 +136,17 @@ def _extract_logits_and_probabilities(
     preprocess_mode: str,
     image_size: tuple[int, int],
     batch_size: int,
+    recover_logits: bool = True,
 ) -> dict[str, np.ndarray | bool]:
     dataset = _build_dataset(frame, preprocess_mode, image_size, batch_size)
     labels = _labels_from_dataset(dataset)
 
     last_layer = model.layers[-1]
-    supports_logits = hasattr(last_layer, "activation") and getattr(last_layer.activation, "__name__", "") == "softmax"
+    supports_logits = (
+        recover_logits
+        and hasattr(last_layer, "activation")
+        and getattr(last_layer.activation, "__name__", "") == "softmax"
+    )
 
     probabilities = model.predict(dataset, verbose=0)
     logits = None
@@ -383,7 +423,14 @@ def _fit_tuning_state(
         raise ValueError(f"Threshold or calibration tuning on '{split_name}' is forbidden.")
 
     tuning_frame = _get_split_frame(tuning_source_manifest, tuning_split, dataset_id=dataset_id, domain=domain)
-    tuning_outputs = _extract_logits_and_probabilities(model, tuning_frame, preprocess_mode, image_size, batch_size)
+    tuning_outputs = _extract_logits_and_probabilities(
+        model,
+        tuning_frame,
+        preprocess_mode,
+        image_size,
+        batch_size,
+        recover_logits=str(calibrate).lower() != "none",
+    )
     tuning_probs = np.asarray(tuning_outputs["probabilities"], dtype=float)
 
     tuned_probs, calibration_details = _prepare_calibration(
@@ -431,9 +478,16 @@ def run_evaluation(
     if split_name not in set(manifest["split"].astype(str)):
         raise ValueError(f"Requested eval split '{split_name}' does not exist in manifest.")
 
-    model = tf.keras.models.load_model(model_path, compile=False)
+    model = _load_model_with_known_custom_objects(model_path)
     eval_frame = _get_split_frame(manifest, split_name, dataset_id=dataset_id, domain=domain)
-    eval_outputs = _extract_logits_and_probabilities(model, eval_frame, preprocess_mode, image_size, batch_size)
+    eval_outputs = _extract_logits_and_probabilities(
+        model,
+        eval_frame,
+        preprocess_mode,
+        image_size,
+        batch_size,
+        recover_logits=str(calibrate).lower() != "none",
+    )
     eval_probs = np.asarray(eval_outputs["probabilities"], dtype=float)
 
     tuning_split, calibration_details, threshold_selection = _fit_tuning_state(
@@ -541,7 +595,7 @@ def run_slice_evaluations(
     if split_name not in set(manifest["split"].astype(str)):
         raise ValueError(f"Requested eval split '{split_name}' does not exist in manifest.")
 
-    model = tf.keras.models.load_model(model_path, compile=False)
+    model = _load_model_with_known_custom_objects(model_path)
     tuning_split, calibration_details, threshold_selection = _fit_tuning_state(
         model=model,
         manifest=manifest,
@@ -579,7 +633,14 @@ def run_slice_evaluations(
                 if slice_frame.empty:
                     continue
 
-            outputs = _extract_logits_and_probabilities(model, slice_frame, preprocess_mode, image_size, batch_size)
+            outputs = _extract_logits_and_probabilities(
+                model,
+                slice_frame,
+                preprocess_mode,
+                image_size,
+                batch_size,
+                recover_logits=str(calibrate).lower() != "none",
+            )
             calibrated_probs = _apply_calibration_to_eval(
                 None if outputs["logits"] is None else np.asarray(outputs["logits"], dtype=float),
                 np.asarray(outputs["probabilities"], dtype=float),
