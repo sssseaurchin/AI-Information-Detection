@@ -72,6 +72,7 @@ def preprocess_sobel_edge(path, label, image_size):
 
 def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2, preprocess_mode: str = "rgb") -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
+<<<<<<< HEAD
     model = models.Sequential(
     [
         # First convolutional block
@@ -106,6 +107,73 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2, pr
         layers.Dropout(0.5),
         layers.Dense(num_classes, activation="softmax"),
     ]
+=======
+    if preprocess_mode.strip().lower() == "wavelet":
+        model = models.Sequential(
+        [
+            # First convolutional block
+            layers.Conv2D(16, (3, 3), padding="same", input_shape=input_shape),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Second convolutional block
+            layers.Conv2D(32, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Third convolutional block
+            layers.Conv2D(64, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Flatten and dense layers
+            layers.Flatten(),
+            layers.Dense(256),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.Dropout(0.5),
+            layers.Dense(num_classes, activation="softmax"),
+        ]
+    )
+    else:
+        model = models.Sequential(
+        [
+            # First convolutional block
+            layers.Conv2D(32, (3, 3), padding="same", input_shape=input_shape),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Second convolutional block
+            layers.Conv2D(64, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Third convolutional block
+            layers.Conv2D(128, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Fourth convolutional block
+            layers.Conv2D(128, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Flatten and dense layers
+            layers.Flatten(),
+            layers.Dense(512),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.Dropout(0.5),
+            layers.Dense(num_classes, activation="softmax"),
+        ]
+>>>>>>> 74e2db06980be2da53850d34bcd542980c334048
     )
     
     return model # type: ignore
