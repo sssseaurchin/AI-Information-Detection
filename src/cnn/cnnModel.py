@@ -70,9 +70,76 @@ def preprocess_sobel_edge(path, label, image_size):
     return get_preprocess_fn("sobel")(path, label, image_size)
 
 
-def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
+def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2, preprocess_mode: str = "rgb") -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
+<<<<<<< HEAD
     model = models.Sequential(
+    [
+        # First convolutional block
+        layers.Conv2D(32, (3, 3), padding="same", input_shape=input_shape),
+        layers.BatchNormalization(),
+        layers.Activation("relu"),
+        layers.MaxPooling2D((2, 2)),
+        layers.Dropout(0.25),
+        # Second convolutional block
+        layers.Conv2D(64, (3, 3), padding="same"),
+        layers.BatchNormalization(),
+        layers.Activation("relu"),
+        layers.MaxPooling2D((2, 2)),
+        layers.Dropout(0.25),
+        # Third convolutional block
+        layers.Conv2D(128, (3, 3), padding="same"),
+        layers.BatchNormalization(),
+        layers.Activation("relu"),
+        layers.MaxPooling2D((2, 2)),
+        layers.Dropout(0.25),
+        # Fourth convolutional block
+        layers.Conv2D(128, (3, 3), padding="same"),
+        layers.BatchNormalization(),
+        layers.Activation("relu"),
+        layers.MaxPooling2D((2, 2)),
+        layers.Dropout(0.25),
+        # Flatten and dense layers
+        layers.Flatten(),
+        layers.Dense(512),
+        layers.BatchNormalization(),
+        layers.Activation("relu"),
+        layers.Dropout(0.5),
+        layers.Dense(num_classes, activation="softmax"),
+    ]
+=======
+    if preprocess_mode.strip().lower() == "wavelet":
+        model = models.Sequential(
+        [
+            # First convolutional block
+            layers.Conv2D(16, (3, 3), padding="same", input_shape=input_shape),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Second convolutional block
+            layers.Conv2D(32, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Third convolutional block
+            layers.Conv2D(64, (3, 3), padding="same"),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.MaxPooling2D((2, 2)),
+            layers.Dropout(0.25),
+            # Flatten and dense layers
+            layers.Flatten(),
+            layers.Dense(256),
+            layers.BatchNormalization(),
+            layers.Activation("relu"),
+            layers.Dropout(0.5),
+            layers.Dense(num_classes, activation="softmax"),
+        ]
+    )
+    else:
+        model = models.Sequential(
         [
             # First convolutional block
             layers.Conv2D(32, (3, 3), padding="same", input_shape=input_shape),
@@ -106,9 +173,10 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) ->
             layers.Dropout(0.5),
             layers.Dense(num_classes, activation="softmax"),
         ]
+>>>>>>> 74e2db06980be2da53850d34bcd542980c334048
     )
-
-    return model
+    
+    return model # type: ignore
 
 
 def build_efficientnet_b0_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
@@ -234,11 +302,11 @@ def build_convnext_tiny_model(input_shape: tuple = (224, 224, 3), num_classes: i
     return model
 
 
-def build_model(arch: str = "simple", input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
+def build_model(arch: str = "simple", input_shape: tuple = (224, 224, 3), num_classes: int = 2, preprocess_mode: str = "rgb") -> tf.keras.Model:
     """Select the requested single-backbone architecture."""
     normalized_arch = arch.strip().lower()
     if normalized_arch == "simple":
-        return build_cnn_model(input_shape=input_shape, num_classes=num_classes)
+        return build_cnn_model(input_shape=input_shape, num_classes=num_classes, preprocess_mode=preprocess_mode) # preprocess_mode used for construction of different models per preprocessing type
     if normalized_arch == "dual_artifact_cnn":
         return build_dual_artifact_cnn_model(input_shape=input_shape, num_classes=num_classes)
     if normalized_arch == "efficientnet_b0":
@@ -573,7 +641,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     train_dataset = train_dataset.filter(lambda img, label, domain: tf.shape(img)[0] == image_size[0])
     
     # Ignore errors for corrupt images - skip them instead of crashing
-    train_dataset = train_dataset.ignore_errors()
+    train_dataset = train_dataset.apply(tf.data.experimental.ignore_errors())
     
     # Apply data augmentation if enabled (only for training)
     if enable_augmentation:
@@ -596,7 +664,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
             train_dataset = train_dataset.cache()  # Memory cache
         else:
             # Use disk cache only if dataset is reasonably sized (< 100K images)
-            if num_samples < 100000:
+            if num_samples < 200000:
                 train_dataset = train_dataset.cache(os.path.join(dataset_path, "train_cache"))
             else:
                 print("Warning: Dataset too large for disk cache, skipping cache for better performance")
@@ -625,7 +693,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     val_dataset = val_dataset.filter(lambda img, label: tf.shape(img)[0] == image_size[0])
 
     # Ignore errors for corrupt images
-    val_dataset = val_dataset.ignore_errors()
+    val_dataset = val_dataset.apply(tf.data.experimental.ignore_errors())
 
     val_dataset = val_dataset.map(
         lambda img, label: _apply_arch_preprocessing(img, label, arch),
@@ -653,6 +721,7 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
         arch=arch,
         input_shape=(image_size[0], image_size[1], 3),
         num_classes=num_classes,
+        preprocess_mode=preprocess_mode,
     )
 
     initial_learning_rate = 0.001
@@ -711,7 +780,10 @@ def train_model(dataset_path: str, epochs: int = 10, batch_size: int = 32, valid
     # Train model
     print(f"\nUsing split manifest: {manifest_path}")
     print(f"Training with {len(train_paths)} training samples and {len(val_paths)} validation samples")
-    print(f"Batch size: {batch_size}, Epochs: {epochs}, Seed: {seed}, Preprocessing: {preprocess_mode}, Arch: {arch}\n")
+    if arch.strip().lower() == "simple":
+        print(f"Batch size: {batch_size}, Epochs: {epochs}, Seed: {seed}, Preprocessing: {preprocess_mode}, Arch: {arch}:{preprocess_mode}\n")
+    else:
+        print(f"Batch size: {batch_size}, Epochs: {epochs}, Seed: {seed}, Preprocessing: {preprocess_mode}, Arch: {arch}\n")
     print(f"Sampling strategy: {sampling_strategy}\n")
     print(
         f"Pipeline settings: parallel_calls={pipeline_parallel_calls}, "
