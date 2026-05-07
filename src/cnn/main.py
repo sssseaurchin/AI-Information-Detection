@@ -1,6 +1,7 @@
-from cnnModel import train_model
-from CSVCreator import create_csv
 import os
+
+from cnnModel import train_model, predict_image
+from CSVCreator import create_csv
 import argparse
 from label_config import get_default_label_config_path, load_label_mapping
 from cnn.preprocessing import get_default_preprocess_mode
