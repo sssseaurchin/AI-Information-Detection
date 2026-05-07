@@ -26,6 +26,12 @@
     "scripts": ["background.js"],
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "aid-dev@extension.local"

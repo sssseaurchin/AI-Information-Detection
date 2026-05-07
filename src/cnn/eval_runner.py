@@ -12,7 +12,7 @@ from calibration import apply_temperature_scaling, brier_score_binary, fit_tempe
 from eval_metrics import select_threshold, threshold_free_metrics, threshold_metrics
 from governance import select_tuning_split_from_policy
 from label_config import load_label_mapping
-from preprocessing import get_preprocess_fn
+from cnn.preprocessing import get_preprocess_fn
 from split_utils import load_manifest_dataframe
 
 
