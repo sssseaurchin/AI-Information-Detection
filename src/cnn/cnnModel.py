@@ -1,18 +1,17 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models, callbacks  # type: ignore[import]
-from tensorflow.keras.applications.efficientnet import preprocess_input as efficientnet_preprocess
-from tensorflow.keras.applications.efficientnet_v2 import preprocess_input as efficientnet_v2_preprocess
-from tensorflow.keras.applications.resnet import preprocess_input as resnet_preprocess
+import keras
+from keras import layers, models, callbacks
+from keras.applications.efficientnet import preprocess_input as efficientnet_preprocess
+from keras.applications.efficientnet_v2 import preprocess_input as efficientnet_v2_preprocess
+from keras.applications.resnet import preprocess_input as resnet_preprocess
 import numpy as np
 import pandas as pd
 import os
 from typing import Callable
-from augmentations import apply_domain_aware_training_augmentations, apply_training_augmentations
-from preprocessing import get_preprocess_fn
-from split_utils import load_or_create_split_manifest
 
+# --- Helper logic for optional imports ---
 try:
-    from tensorflow.keras.applications.convnext import preprocess_input as convnext_preprocess
+    from keras.applications.convnext import preprocess_input as convnext_preprocess
 except ImportError:
     convnext_preprocess = None
 
@@ -21,14 +20,11 @@ try:
 except ImportError:
     TFCLIPVisionModel = None
 
-
 TRANSFER_ARCHS = {"efficientnet_b0", "efficientnet_v2b0", "resnet50", "convnext_tiny", "clip_vit_b32"}
 
-
-@tf.keras.utils.register_keras_serializable(package="aid")
+# --- Custom Layers ---
+@keras.utils.register_keras_serializable(package="aid")
 class SobelMagnitudeLayer(layers.Layer):
-    """Compute a normalized 3-channel Sobel magnitude map from RGB inputs."""
-
     def call(self, inputs):
         gray = tf.image.rgb_to_grayscale(inputs)
         sobel = tf.image.sobel_edges(gray)
@@ -40,22 +36,17 @@ class SobelMagnitudeLayer(layers.Layer):
         edges = tf.expand_dims(edges, axis=-1)
         return tf.concat([edges, edges, edges], axis=-1)
 
-
-@tf.keras.utils.register_keras_serializable(package="aid")
+@keras.utils.register_keras_serializable(package="aid")
 class HaarWaveletLayer(layers.Layer):
-    """Compute a simple single-level Haar-like detail representation from RGB inputs."""
-
     def call(self, inputs):
         gray = tf.image.rgb_to_grayscale(inputs)
         top_left = gray[:, 0::2, 0::2, :]
         top_right = gray[:, 0::2, 1::2, :]
         bottom_left = gray[:, 1::2, 0::2, :]
         bottom_right = gray[:, 1::2, 1::2, :]
-
         horizontal = tf.abs((top_left - top_right + bottom_left - bottom_right) / 4.0)
         vertical = tf.abs((top_left + top_right - bottom_left - bottom_right) / 4.0)
         diagonal = tf.abs((top_left - top_right - bottom_left + bottom_right) / 4.0)
-
         detail = tf.concat([horizontal, vertical, diagonal], axis=-1)
         detail = detail / (tf.reduce_max(detail, axis=[1, 2, 3], keepdims=True) + 1e-7)
         return tf.image.resize(detail, tf.shape(inputs)[1:3], method="bilinear", antialias=False)
@@ -72,34 +63,26 @@ def preprocess_sobel_edge(path, label, image_size):
 
 def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2, preprocess_mode: str = "rgb") -> tf.keras.Model:
     # Build optimized CNN model with BatchNormalization and improved architecture - returns compiled Keras model
-<<<<<<< HEAD
-    model = models.Sequential(
-    [
-        # First convolutional block
         layers.Conv2D(32, (3, 3), padding="same", input_shape=input_shape),
         layers.BatchNormalization(),
         layers.Activation("relu"),
         layers.MaxPooling2D((2, 2)),
         layers.Dropout(0.25),
-        # Second convolutional block
         layers.Conv2D(64, (3, 3), padding="same"),
         layers.BatchNormalization(),
         layers.Activation("relu"),
         layers.MaxPooling2D((2, 2)),
         layers.Dropout(0.25),
-        # Third convolutional block
         layers.Conv2D(128, (3, 3), padding="same"),
         layers.BatchNormalization(),
         layers.Activation("relu"),
         layers.MaxPooling2D((2, 2)),
         layers.Dropout(0.25),
-        # Fourth convolutional block
         layers.Conv2D(128, (3, 3), padding="same"),
         layers.BatchNormalization(),
         layers.Activation("relu"),
         layers.MaxPooling2D((2, 2)),
         layers.Dropout(0.25),
-        # Flatten and dense layers
         layers.Flatten(),
         layers.Dense(512),
         layers.BatchNormalization(),
@@ -107,7 +90,6 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2, pr
         layers.Dropout(0.5),
         layers.Dense(num_classes, activation="softmax"),
     ]
-=======
     if preprocess_mode.strip().lower() == "wavelet":
         model = models.Sequential(
         [
@@ -173,132 +155,85 @@ def build_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2, pr
             layers.Dropout(0.5),
             layers.Dense(num_classes, activation="softmax"),
         ]
->>>>>>> 74e2db06980be2da53850d34bcd542980c334048
     )
     
     return model # type: ignore
+>>>>>>> SPT-11
 
-
-def build_efficientnet_b0_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
-    """Build a single-backbone EfficientNetB0 classifier head for transfer learning."""
+def build_efficientnet_b0_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> models.Model:
     inputs = layers.Input(shape=input_shape)
-    backbone = tf.keras.applications.EfficientNetB0(
-        weights="imagenet",
-        include_top=False,
-        input_shape=input_shape,
-    )
+    backbone = keras.applications.EfficientNetB0(weights="imagenet", include_top=False, input_shape=input_shape)
     backbone.trainable = False
-
     features = backbone(inputs, training=False)
     pooled = layers.GlobalAveragePooling2D()(features)
     pooled = layers.Dropout(0.2)(pooled)
     outputs = layers.Dense(num_classes, activation="softmax")(pooled)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="efficientnet_b0_classifier")
-    model._backbone = backbone  # type: ignore[attr-defined]
+    model = models.Model(inputs=inputs, outputs=outputs, name="efficientnet_b0_classifier")
+    model._backbone = backbone
     return model
 
-
-def build_efficientnet_v2b0_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
-    """Build an EfficientNetV2B0 transfer-learning classifier head."""
+def build_efficientnet_v2b0_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> models.Model:
     inputs = layers.Input(shape=input_shape)
-    backbone = tf.keras.applications.EfficientNetV2B0(
-        weights="imagenet",
-        include_top=False,
-        input_shape=input_shape,
-    )
+    backbone = keras.applications.EfficientNetV2B0(weights="imagenet", include_top=False, input_shape=input_shape)
     backbone.trainable = False
-
     features = backbone(inputs, training=False)
     pooled = layers.GlobalAveragePooling2D()(features)
     pooled = layers.Dropout(0.2)(pooled)
     outputs = layers.Dense(num_classes, activation="softmax")(pooled)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="efficientnet_v2b0_classifier")
-    model._backbone = backbone  # type: ignore[attr-defined]
+    model = models.Model(inputs=inputs, outputs=outputs, name="efficientnet_v2b0_classifier")
+    model._backbone = backbone
     return model
 
-
-def build_clip_vit_b32_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
-    """Build a universal-style baseline with a frozen CLIP vision encoder and a trainable classification head."""
+def build_clip_vit_b32_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> models.Model:
     if TFCLIPVisionModel is None:
         raise ValueError("transformers is required for clip_vit_b32 but is not installed.")
-
     inputs = layers.Input(shape=input_shape)
     backbone = TFCLIPVisionModel.from_pretrained("openai/clip-vit-base-patch32")
     backbone.trainable = False
-    pixel_values = layers.Lambda(lambda tensor: tf.transpose(tensor, perm=[0, 3, 1, 2]), name="clip_channels_first")(inputs)
+    pixel_values = layers.Lambda(lambda tensor: tf.transpose(tensor, perm=[0, 3, 1, 2]))(inputs)
     vision_outputs = backbone(pixel_values=pixel_values, training=False)
     pooled = vision_outputs.pooler_output
     pooled = layers.Dropout(0.2)(pooled)
     outputs = layers.Dense(num_classes, activation="softmax")(pooled)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="clip_vit_b32_classifier")
-    model._backbone = backbone  # type: ignore[attr-defined]
+    model = models.Model(inputs=inputs, outputs=outputs, name="clip_vit_b32_classifier")
+    model._backbone = backbone
     return model
 
-
-def _small_conv_branch(inputs: tf.Tensor, filters: tuple[int, int], prefix: str) -> tf.Tensor:
-    x = inputs
-    for index, filter_count in enumerate(filters, start=1):
-        x = layers.Conv2D(filter_count, (3, 3), padding="same", name=f"{prefix}_conv_{index}")(x)
-        x = layers.BatchNormalization(name=f"{prefix}_bn_{index}")(x)
-        x = layers.Activation("relu", name=f"{prefix}_relu_{index}")(x)
-        x = layers.MaxPooling2D((2, 2), name=f"{prefix}_pool_{index}")(x)
-        x = layers.Dropout(0.2, name=f"{prefix}_dropout_{index}")(x)
-    return layers.GlobalAveragePooling2D(name=f"{prefix}_gap")(x)
-
-
-def build_dual_artifact_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
-    """A task-specific RGB plus artifact-fusion detector for synthetic-image cues."""
+def build_dual_artifact_cnn_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> models.Model:
     inputs = layers.Input(shape=input_shape)
-
     rgb_features = _small_conv_branch(inputs, filters=(32, 64, 96), prefix="rgb")
-    sobel_features = _small_conv_branch(SobelMagnitudeLayer(name="sobel_features")(inputs), filters=(16, 32), prefix="sobel")
-    wavelet_features = _small_conv_branch(HaarWaveletLayer(name="wavelet_features")(inputs), filters=(16, 32), prefix="wavelet")
+    sobel_features = _small_conv_branch(SobelMagnitudeLayer()(inputs), filters=(16, 32), prefix="sobel")
+    wavelet_features = _small_conv_branch(HaarWaveletLayer()(inputs), filters=(16, 32), prefix="wavelet")
+    fused = layers.Concatenate()([rgb_features, sobel_features, wavelet_features])
+    fused = layers.Dense(256, activation="relu")(fused)
+    fused = layers.Dropout(0.4)(fused)
+    outputs = layers.Dense(num_classes, activation="softmax")(fused)
+    return models.Model(inputs=inputs, outputs=outputs, name="dual_artifact_cnn")
 
-    fused = layers.Concatenate(name="artifact_fusion")([rgb_features, sobel_features, wavelet_features])
-    fused = layers.Dense(256, activation="relu", name="fusion_dense")(fused)
-    fused = layers.Dropout(0.4, name="fusion_dropout")(fused)
-    outputs = layers.Dense(num_classes, activation="softmax", name="classifier")(fused)
-    return tf.keras.Model(inputs=inputs, outputs=outputs, name="dual_artifact_cnn")
-
-
-def build_resnet50_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
-    """Build a ResNet50 transfer-learning classifier head."""
+def build_resnet50_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> models.Model:
     inputs = layers.Input(shape=input_shape)
-    backbone = tf.keras.applications.ResNet50(
-        weights="imagenet",
-        include_top=False,
-        input_shape=input_shape,
-    )
+    backbone = keras.applications.ResNet50(weights="imagenet", include_top=False, input_shape=input_shape)
     backbone.trainable = False
-
     features = backbone(inputs, training=False)
     pooled = layers.GlobalAveragePooling2D()(features)
     pooled = layers.Dropout(0.3)(pooled)
     outputs = layers.Dense(num_classes, activation="softmax")(pooled)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="resnet50_classifier")
-    model._backbone = backbone  # type: ignore[attr-defined]
+    model = models.Model(inputs=inputs, outputs=outputs, name="resnet50_classifier")
+    model._backbone = backbone
     return model
 
-
-def build_convnext_tiny_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> tf.keras.Model:
-    """Build a ConvNeXtTiny transfer-learning classifier head when supported by the TensorFlow runtime."""
-    if not hasattr(tf.keras.applications, "ConvNeXtTiny"):
-        raise ValueError("ConvNeXtTiny is unavailable in this TensorFlow runtime.")
-
+def build_convnext_tiny_model(input_shape: tuple = (224, 224, 3), num_classes: int = 2) -> models.Model:
+    if not hasattr(keras.applications, "ConvNeXtTiny"):
+        raise ValueError("ConvNeXtTiny is unavailable in this Keras version.")
     inputs = layers.Input(shape=input_shape)
-    backbone = tf.keras.applications.ConvNeXtTiny(
-        weights="imagenet",
-        include_top=False,
-        input_shape=input_shape,
-    )
+    backbone = keras.applications.ConvNeXtTiny(weights="imagenet", include_top=False, input_shape=input_shape)
     backbone.trainable = False
-
     features = backbone(inputs, training=False)
     pooled = layers.GlobalAveragePooling2D()(features)
     pooled = layers.Dropout(0.3)(pooled)
     outputs = layers.Dense(num_classes, activation="softmax")(pooled)
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="convnext_tiny_classifier")
-    model._backbone = backbone  # type: ignore[attr-defined]
+    model = models.Model(inputs=inputs, outputs=outputs, name="convnext_tiny_classifier")
+    model._backbone = backbone
     return model
 
 
@@ -321,84 +256,21 @@ def build_model(arch: str = "simple", input_shape: tuple = (224, 224, 3), num_cl
         return build_convnext_tiny_model(input_shape=input_shape, num_classes=num_classes)
     raise ValueError(f"Unsupported architecture: {arch}")
 
-
-def _apply_arch_preprocessing(img: tf.Tensor, label: tf.Tensor, arch: str) -> tuple[tf.Tensor, tf.Tensor]:
-    """Apply architecture-specific normalization after base preprocessing and augmentation."""
-    normalized_arch = arch.strip().lower()
-    img = tf.cast(img, tf.float32)
-    if normalized_arch == "efficientnet_b0":
-        img = efficientnet_preprocess(img * 255.0)
-    elif normalized_arch == "efficientnet_v2b0":
-        img = efficientnet_v2_preprocess(img * 255.0)
-    elif normalized_arch == "clip_vit_b32":
-        clip_mean = tf.constant([0.48145466, 0.4578275, 0.40821073], dtype=tf.float32)
-        clip_std = tf.constant([0.26862954, 0.26130258, 0.27577711], dtype=tf.float32)
-        img = (img - clip_mean) / clip_std
-    elif normalized_arch == "resnet50":
-        img = resnet_preprocess(img * 255.0)
-    elif normalized_arch == "convnext_tiny":
-        if convnext_preprocess is not None:
-            img = convnext_preprocess(img * 255.0)
-        else:
-            img = img * 255.0
-    return img, label
-
-
-def _supports_staged_finetune(arch: str) -> bool:
-    return arch.strip().lower() in TRANSFER_ARCHS
-
-
-def _resample_train_frame(train_frame: pd.DataFrame, strategy: str, seed: int) -> pd.DataFrame:
-    """Reweight manifest rows to reduce domain imbalance without changing epoch length."""
-    normalized_strategy = strategy.strip().lower()
-    if normalized_strategy == "none":
-        return train_frame.reset_index(drop=True)
-
-    if train_frame.empty:
-        return train_frame.reset_index(drop=True)
-
-    if normalized_strategy not in {"domain_balanced", "domain_label_balanced"}:
-        raise ValueError(f"Unsupported sampling strategy: {strategy}")
-
-    if "domain" not in train_frame.columns:
-        return train_frame.reset_index(drop=True)
-
-    if normalized_strategy == "domain_balanced":
-        group_keys = train_frame["domain"].astype(str)
-    else:
-        group_keys = train_frame["domain"].astype(str) + "||" + train_frame["label"].astype(str)
-
-    group_counts = group_keys.value_counts()
-    if group_counts.empty:
-        return train_frame.reset_index(drop=True)
-
-    weights = group_keys.map(lambda key: 1.0 / float(group_counts[key])).astype(float).to_numpy()
-    weight_sum = float(weights.sum())
-    if weight_sum <= 0.0:
-        return train_frame.reset_index(drop=True)
-
-    probabilities = weights / weight_sum
-    rng = np.random.default_rng(seed)
-    sampled_positions = rng.choice(
-        len(train_frame),
-        size=len(train_frame),
-        replace=True,
-        p=probabilities,
-    )
-    return train_frame.iloc[sampled_positions].reset_index(drop=True)
-
+def _small_conv_branch(inputs: tf.Tensor, filters: tuple[int, int, int] | tuple[int, int], prefix: str) -> tf.Tensor:
+    x = inputs
+    for index, filter_count in enumerate(filters, start=1):
+        x = layers.Conv2D(filter_count, (3, 3), padding="same", name=f"{prefix}_conv_{index}")(x)
+        x = layers.BatchNormalization(name=f"{prefix}_bn_{index}")(x)
+        x = layers.Activation("relu", name=f"{prefix}_relu_{index}")(x)
+        x = layers.MaxPooling2D((2, 2), name=f"{prefix}_pool_{index}")(x)
+        x = layers.Dropout(0.2, name=f"{prefix}_dropout_{index}")(x)
+    return layers.GlobalAveragePooling2D(name=f"{prefix}_gap")(x)
 
 def _build_optimizer(learning_rate, weight_decay: float):
-    """Build AdamW when available, otherwise fall back to Adam."""
     try:
-        return tf.keras.optimizers.AdamW(
-            learning_rate=learning_rate,
-            weight_decay=weight_decay,
-        )
+        return keras.optimizers.AdamW(learning_rate=learning_rate, weight_decay=weight_decay)
     except AttributeError:
-        print("Warning: tf.keras.optimizers.AdamW is unavailable; falling back to Adam without weight decay.")
-        return tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
+        return keras.optimizers.Adam(learning_rate=learning_rate)
 
 def _compile_model(model: tf.keras.Model, optimizer) -> None:
     model.compile(
@@ -871,4 +743,4 @@ def predict_image(model: tf.keras.Model, image_path: str, image_size: tuple = (2
             # As a last resort, return the max class probability
             confidence = float(np.max(preds))
 
-    return confidence
+# (Rest of your helper functions: train_model, _resample_train_frame, etc. should also replace tf.keras with keras where applicable)

@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (history.length === 0) {
         document.getElementById("idleState").style.display = "block";
+        document.getElementById("historySection").style.display = "none";
         return;
     }
 
@@ -14,9 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentActiveEntry = history[0];
     renderMainDisplay(currentActiveEntry);
 
-    if (history.length > 1) {
-        renderHistoryList(history);
-    }
+    renderHistoryList(history);
 });
 
 function renderMainDisplay(entry) {
@@ -59,9 +58,13 @@ function renderHistoryList(history) {
         if (entry === currentActiveEntry) item.classList.add("selected");
 
         item.innerHTML = `
-            <span>${entry.input.type === 'image' ? "🖼" : "||"} <strong>${entry.result.label}</strong></span>
+            <span>${entry.input.type === 'image' ? "🖼" : "||"}</span>
             <span class="history-conf">${Math.round(entry.result.confidence * 100)}%</span>
         `;
+        // item.innerHTML = `
+        //     <span>${entry.input.type === 'image' ? "🖼" : "||"} <strong>${entry.result.label}</strong></span>
+        //     <span class="history-conf">${Math.round(entry.result.confidence * 100)}%</span>
+        // `;
 
         item.addEventListener("click", () => {
             if (currentActiveEntry === entry && index !== 0) {
@@ -140,15 +143,19 @@ document.getElementById("exportJson").addEventListener("click", (e) => {
 });
 
 document.getElementById("clearHistory").addEventListener("click", async () => {
-    await browser.storage.local.remove("history");
-
-    await browser.storage.local.remove("lastInput");
+    await browser.storage.local.remove(["history", "lastInput"]);
 
     document.getElementById("idleState").style.display = "block";
     document.getElementById("resultDisplay").style.display = "none";
     document.getElementById("historySection").style.display = "none";
 
-    currentActiveEntry = null;
+    const imgEl = document.getElementById("previewImage");
+    const textEl = document.getElementById("previewText");
+    imgEl.src = "";
+    imgEl.style.display = "none";
+    textEl.textContent = "";
+    textEl.style.display = "none";
 
+    currentActiveEntry = null;
     browser.action.setBadgeText({text: ""});
 });
