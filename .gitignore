@@ -400,3 +400,7 @@ src/cnn/DRCT-main/
 # Local virtual environments
 venv/
 src/venv/
+
+# Local Codex workspace workflow files
+PROJECT_ADDON.md
+TASKS.md
